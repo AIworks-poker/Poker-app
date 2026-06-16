@@ -20,6 +20,9 @@ export interface Setup {
   antes: boolean
   graceSeconds: number
   padel: boolean
+  // padel (admin-only layer): shared court + ball costs
+  courtPrice: number
+  ballPrice: number
   // money
   currency: string
   buyInPrice: number
@@ -45,7 +48,9 @@ export const DEFAULT_SETUP: Setup = {
   speed: 'normal',
   antes: true,
   graceSeconds: 60,
-  padel: true,
+  padel: false,           // off by default; the dealer enables it in the padel card
+  courtPrice: 750,
+  ballPrice: 160,
   currency: 'Kč',
   buyInPrice: 295,
   rebuyPrice: 295,

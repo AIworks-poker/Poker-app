@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { planChips, playerStacks, padelApplies, chipBreakdown } from '@/lib/chips'
 import { generateBlinds, totalDuration, type Speed } from '@/lib/blinds'
 import { prizePool, tournamentPayouts, formatMoney } from '@/lib/money'
+import { padelCosts, padelSchedule } from '@/lib/padel'
 import { type Setup, DEFAULT_SETUP, MAX_PLAYERS, normalizeNames, SETUP_KEY, EDITING_KEY } from '@/lib/setup'
 
 const CHIP_CSS: Record<string, string> = {
@@ -26,6 +27,8 @@ export default function Home() {
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null)
   const [saved, setSaved] = useState<Tmpl[]>([])
   const [msg, setMsg] = useState('')
+  const [admin, setAdmin] = useState(false)   // padel layer is visible only to the logged-in dealer
+  useEffect(() => { fetch('/api/dealer/me').then(r => r.json()).then(d => setAdmin(!!d.admin)).catch(() => {}) }, [])
 
   // load persisted setup + any "edit this template" handoff from /dealer
   useEffect(() => {
@@ -109,6 +112,9 @@ export default function Home() {
   function refresh() { fetch('/api/templates').then(r => r.json()).then(d => setSaved(d.templates ?? [])).catch(() => {}) }
 
   const padelOn = s.padel && padelApplies(s.players)
+  const pCosts = padelCosts(s.players, s.courtPrice, s.ballPrice)
+  const scheme = padelSchedule(s.players)
+  const pnames = normalizeNames(s.names, s.players).map((n, i) => n.trim() || `P${i + 1}`)
 
   return (
     <main className="wrap">
@@ -171,7 +177,6 @@ export default function Home() {
           <label className="toggle"><input type="checkbox" checked={s.addOns} onChange={e => set('addOns', e.target.checked)} /> Add-ons</label>
           {s.addOns && <label>add-on chips<input type="number" min={0} step={100} value={s.addOnValue} onChange={e => set('addOnValue', +e.target.value || 0)} /></label>}
           <label className="toggle"><input type="checkbox" checked={s.antes} onChange={e => set('antes', e.target.checked)} /> Antes</label>
-          <label className="toggle"><input type="checkbox" checked={s.padel} onChange={e => set('padel', e.target.checked)} /> Padel head-start</label>
         </div>
       </div>
 
@@ -227,6 +232,48 @@ export default function Home() {
           ))}
         </div>
       </div>
+
+      {/* Padel — ADMIN ONLY (hidden from the public): shared costs + play scheme */}
+      {admin && (
+        <div className="card" style={{ borderStyle: 'dashed', borderColor: '#7F77DD' }}>
+          <h2 style={{ margin: '0 0 10px', color: '#9b94e6' }}>🎾 Padel <span className="muted" style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>— only you (the dealer) see this</span></h2>
+          <div className="row" style={{ marginBottom: 10 }}>
+            <label className="toggle"><input type="checkbox" checked={s.padel} onChange={e => set('padel', e.target.checked)} /> Feed padel finishing order into starting stacks (head-start)</label>
+          </div>
+          <div className="row" style={{ marginBottom: 10 }}>
+            <label>Court price<input type="number" min={0} value={s.courtPrice} onChange={e => set('courtPrice', +e.target.value || 0)} /></label>
+            <label>Balls price (per set)<input type="number" min={0} value={s.ballPrice} onChange={e => set('ballPrice', +e.target.value || 0)} /></label>
+          </div>
+          {padelApplies(s.players) ? (
+            <p className="muted" style={{ fontSize: 12 }}>{pCosts.courts} courts · {pCosts.sets} ball sets · total {formatMoney(pCosts.total, s.currency)} → <b style={{ color: 'var(--text)' }}>{formatMoney(pCosts.perHead, s.currency)}</b> per player (shared equally — pays the venue, not the poker pot).</p>
+          ) : (
+            <p className="muted" style={{ fontSize: 12 }}>Padel needs a multiple of 4 players (8/12/16/20/24). Currently {s.players}.</p>
+          )}
+          {scheme ? (
+            <>
+              <h3 style={{ margin: '14px 0 6px', fontSize: 13 }}>Play scheme — {scheme.length} rounds × {pCosts.courts} courts (americano)</h3>
+              <div style={{ overflowX: 'auto' }}>
+                <table>
+                  <thead><tr><th>Round</th>{Array.from({ length: pCosts.courts }, (_, c) => <th key={c}>Court {c + 1}</th>)}</tr></thead>
+                  <tbody>
+                    {scheme.map((round, r) => (
+                      <tr key={r}>
+                        <td><b>{r + 1}</b></td>
+                        {round.map((court, c) => (
+                          <td key={c} style={{ whiteSpace: 'nowrap' }}>{pnames[court[0][0]]} &amp; {pnames[court[0][1]]} <span className="muted">v</span> {pnames[court[1][0]]} &amp; {pnames[court[1][1]]}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="muted" style={{ fontSize: 11, marginTop: 6 }}>Everyone partners exactly once; no opponent more than twice. Names come from the field above.</p>
+            </>
+          ) : padelApplies(s.players) ? (
+            <p className="muted" style={{ fontSize: 12 }}>Play scheme is pre-computed for 8, 12 and 16 players.</p>
+          ) : null}
+        </div>
+      )}
 
       {/* Chip inventory — fully editable: rename / count / value / add / remove */}
       <div className="card">
