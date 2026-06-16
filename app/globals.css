@@ -76,6 +76,6 @@ input[type=range] { width: 220px; accent-color: var(--accent); padding: 0; }
 /* admin "logged in" marker — bright red B, top-right, every page */
 .admin-badge { position: fixed; top: 10px; right: 12px; z-index: 1000; width: 34px; height: 34px;
   display: flex; align-items: center; justify-content: center; border-radius: 50%;
-  background: #ff1f1f; color: #fff; font-weight: 800; font-size: 18px; text-decoration: none;
-  box-shadow: 0 2px 8px rgba(255,31,31,0.5); border: 2px solid #fff2; }
-.admin-badge:hover { background: #ff3b3b; }
+  background: transparent; color: #ff1f1f; font-weight: 900; font-size: 26px; text-decoration: none;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
+.admin-badge:hover { color: #ff4b4b; }
