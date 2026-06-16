@@ -10,7 +10,7 @@
  * No accounts, no cookies — live state persists only in this browser.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { generateBlinds, type BlindLevel } from '@/lib/blinds'
 import { playerStacks, padelApplies } from '@/lib/chips'
 import { prizePool, tournamentPayouts, formatMoney } from '@/lib/money'
@@ -27,6 +27,33 @@ export default function Run() {
   const [live, setLive] = useState<Live>({ rebuys: [], addOns: [], out: [], finalChips: [] })
   const [clock, setClock] = useState<{ idx: number; phase: Phase; secondsLeft: number }>({ idx: 0, phase: 'level', secondsLeft: 0 })
   const [running, setRunning] = useState(false)
+  const [sound, setSound] = useState(true)
+  const acRef = useRef<AudioContext | null>(null)
+  const prevLevelIdx = useRef(0)
+
+  function ensureAudio() {
+    try {
+      const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+      if (!AC) return
+      if (!acRef.current) acRef.current = new AC()
+      if (acRef.current.state === 'suspended') acRef.current.resume()
+    } catch {}
+  }
+  function playBuzzer() {
+    ensureAudio()
+    const ac = acRef.current
+    if (!ac) return
+    const t0 = ac.currentTime
+    for (const [off, f] of [[0, 880], [0.2, 660]] as const) {
+      const o = ac.createOscillator(), g = ac.createGain()
+      o.type = 'square'; o.frequency.value = f
+      o.connect(g); g.connect(ac.destination)
+      g.gain.setValueAtTime(0.0001, t0 + off)
+      g.gain.exponentialRampToValueAtTime(0.35, t0 + off + 0.01)
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + off + 0.18)
+      o.start(t0 + off); o.stop(t0 + off + 0.2)
+    }
+  }
 
   // load setup + live state
   useEffect(() => {
@@ -65,6 +92,12 @@ export default function Run() {
     return () => clearInterval(t)
   }, [running, blinds])
   useEffect(() => { if (clock.phase === 'over') setRunning(false) }, [clock.phase])
+  // buzzer when a new (non-break) level begins — blinds just went up
+  useEffect(() => {
+    const r = blinds[clock.idx]
+    if (clock.phase === 'level' && clock.idx !== prevLevelIdx.current && clock.idx > 0 && r && !r.isBreak && sound) playBuzzer()
+    prevLevelIdx.current = clock.idx
+  }, [clock.idx, clock.phase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!s) return <main className="wrap"><p className="muted">Loading…</p></main>
   if (!s.players) return <main className="wrap"><p>Nothing set up yet. <a href="/">Configure a tournament →</a></p></main>
@@ -107,8 +140,7 @@ export default function Run() {
     })
   }
   function toggleAddOn(i: number) { setLive(l => ({ ...l, addOns: l.addOns.map((v, j) => j === i ? !v : v) })) }
-  function knockOut(i: number) { setLive(l => l.out.includes(i) ? l : ({ ...l, out: [...l.out, i] })) }
-  function reviveLast() { setLive(l => ({ ...l, out: l.out.slice(0, -1) })) }
+  function toggleOut(i: number) { setLive(l => l.out.includes(i) ? { ...l, out: l.out.filter(x => x !== i) } : { ...l, out: [...l.out, i] }) }
   function setFinal(i: number, v: number) { setLive(l => ({ ...l, finalChips: l.finalChips.map((x, j) => j === i ? v : x) })) }
 
   // standings for the leaderboard
@@ -141,9 +173,10 @@ export default function Run() {
         )}
         <div className="ctrls">
           <button onClick={() => advance(-1)}>⏮ Prev</button>
-          <button className="primary" onClick={() => setRunning(r => !r)} disabled={clock.phase === 'over'}>{running ? '⏸ Pause' : '▶ Start'}</button>
+          <button className="primary" onClick={() => { if (!running) ensureAudio(); setRunning(r => !r) }} disabled={clock.phase === 'over'}>{running ? '⏸ Pause' : '▶ Start'}</button>
           <button onClick={() => advance(1)}>Next ⏭</button>
           <button onClick={resetClock}>↺ Reset</button>
+          <button onClick={() => { setSound(v => !v); ensureAudio() }} title={sound ? 'Mute buzzer' : 'Unmute buzzer'}>{sound ? '🔊' : '🔇'}</button>
         </div>
       </div>
 
@@ -169,7 +202,7 @@ export default function Run() {
               <th>Player</th>
               {s.rebuys && <th>Rebuys{s.maxRebuysTotal ? ` (${Math.max(0, s.maxRebuysTotal - totalRebuys)} left)` : ''}</th>}
               {s.addOns && <th>Add-on</th>}
-              {s.payoutMode === 'tournament' ? <th className="right">Status</th> : <th className="right">Final chips</th>}
+              {s.payoutMode === 'tournament' ? <th className="right">Busted?</th> : <th className="right">Final chips</th>}
             </tr>
           </thead>
           <tbody>
@@ -185,16 +218,14 @@ export default function Run() {
                   })()}
                   {s.addOns && <td><input type="checkbox" checked={!!live.addOns[i]} onChange={() => toggleAddOn(i)} /></td>}
                   {s.payoutMode === 'tournament'
-                    ? <td className="right">{place ? `${ord(place)}${place <= payouts.length ? ` · ${money(payouts[place - 1])}` : ''}` : <button onClick={() => knockOut(i)} style={{ fontSize: 12, padding: '4px 12px' }}>Knock out</button>}</td>
+                    ? <td className="right"><label className="toggle" style={{ justifyContent: 'flex-end' }}><input type="checkbox" checked={live.out.includes(i)} onChange={() => toggleOut(i)} /> {place ? `${ord(place)}${place <= payouts.length ? ` · ${money(payouts[place - 1])}` : ''}` : 'in'}</label></td>
                     : <td className="right"><input type="number" min={0} value={live.finalChips[i] || 0} onChange={e => setFinal(i, +e.target.value || 0)} /></td>}
                 </tr>
               )
             })}
           </tbody>
         </table>
-        {s.payoutMode === 'tournament' && live.out.length > 0 && (
-          <p className="muted" style={{ fontSize: 12, marginTop: 8 }}><button onClick={reviveLast} style={{ fontSize: 12, padding: '4px 12px' }}>Undo last knockout</button> ({names[live.out[live.out.length - 1]]})</p>
-        )}
+        {s.payoutMode === 'tournament' && <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>Tick a player when they bust. Finishing places fill from last upward; the last player left wins. Untick to undo.</p>}
       </div>
 
       {/* Leaderboard */}
