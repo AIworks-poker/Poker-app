@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',          // static site — no server, deployable anywhere
+  // server app (auth + DB + email) — NOT static export.
   images: { unoptimized: true },
-  trailingSlash: true,
 }
 export default nextConfig

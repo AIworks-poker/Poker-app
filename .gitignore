@@ -8,3 +8,5 @@ next-env.d.ts
 .b.log
 .npm.log
 .vercel
+
+.vercel

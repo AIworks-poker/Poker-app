@@ -50,6 +50,12 @@ export default function Home() {
 
   const set = <K extends keyof State>(k: K, v: State[K]) => setS(p => ({ ...p, [k]: v }))
 
+  // Public read-only: dealer-curated templates from the DB (anonymous configs).
+  const [saved, setSaved] = useState<{ id: string; name: string; config: Partial<State> }[]>([])
+  useEffect(() => {
+    fetch('/api/templates').then(r => r.json()).then(d => setSaved(d.templates ?? [])).catch(() => {})
+  }, [])
+
   function loadTemplate(id: '8p' | '12p' | '16p') {
     const t = getTemplate(id)!
     setS(p => ({
@@ -91,6 +97,13 @@ export default function Home() {
           ))}
           <span className="muted" style={{ fontSize: 12 }}>house set · 2,500 stack · padel head-start</span>
         </div>
+        {saved.length > 0 && (
+          <div className="row" style={{ marginTop: 8 }}>
+            {saved.map(t => (
+              <button key={t.id} className="pill" onClick={() => setS(p => ({ ...p, ...t.config }))}>{t.name}</button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Setup */}
@@ -179,7 +192,7 @@ export default function Home() {
         </table>
       </div>
 
-      <p className="muted" style={{ fontSize: 11, marginTop: 20 }}>Saved only in your browser. Nothing is uploaded.</p>
+      <p className="muted" style={{ fontSize: 11, marginTop: 20 }}>No accounts, no cookies, no tracking. We never log your IP.</p>
     </main>
   )
 }
