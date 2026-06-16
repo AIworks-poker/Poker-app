@@ -89,7 +89,18 @@ export default function Run() {
   const aliveIdx = Array.from({ length: s.players }, (_, i) => i).filter(i => !live.out.includes(i))
   const winnerIdx = aliveIdx.length === 1 ? aliveIdx[0] : null
 
-  function setRebuy(i: number, d: number) { setLive(l => ({ ...l, rebuys: l.rebuys.map((v, j) => j === i ? Math.max(0, v + d) : v) })) }
+  function setRebuy(i: number, d: number) {
+    setLive(l => {
+      const cur = l.rebuys[i] || 0
+      const next = Math.max(0, cur + d)
+      if (d > 0) {
+        if (s!.maxRebuysPerPlayer && next > s!.maxRebuysPerPlayer) return l
+        const total = l.rebuys.reduce((a, b) => a + b, 0)
+        if (s!.maxRebuysTotal && total - cur + next > s!.maxRebuysTotal) return l
+      }
+      return { ...l, rebuys: l.rebuys.map((v, j) => j === i ? next : v) }
+    })
+  }
   function toggleAddOn(i: number) { setLive(l => ({ ...l, addOns: l.addOns.map((v, j) => j === i ? !v : v) })) }
   function knockOut(i: number) { setLive(l => l.out.includes(i) ? l : ({ ...l, out: [...l.out, i] })) }
   function reviveLast() { setLive(l => ({ ...l, out: l.out.slice(0, -1) })) }
@@ -136,7 +147,7 @@ export default function Run() {
         <div className="kpi">
           <div><b>{money(pool)}</b><span>prize pool</span></div>
           <div><b>{s.players}</b><span>players</span></div>
-          {s.rebuys && <div><b>{totalRebuys}</b><span>rebuys</span></div>}
+          {s.rebuys && <div><b>{totalRebuys}{s.maxRebuysTotal ? `/${s.maxRebuysTotal}` : ''}</b><span>rebuys used</span></div>}
           {s.addOns && <div><b>{totalAddOns}</b><span>add-ons</span></div>}
           {s.payoutMode === 'tournament'
             ? <div><b>{money(payouts[0] ?? 0)}</b><span>winner gets</span></div>
@@ -151,7 +162,7 @@ export default function Run() {
           <thead>
             <tr>
               <th>Player</th>
-              {s.rebuys && <th>Rebuys</th>}
+              {s.rebuys && <th>Rebuys{s.maxRebuysTotal ? ` (${Math.max(0, s.maxRebuysTotal - totalRebuys)} left)` : ''}</th>}
               {s.addOns && <th>Add-on</th>}
               {s.payoutMode === 'tournament' ? <th className="right">Status</th> : <th className="right">Final chips</th>}
             </tr>
@@ -162,7 +173,11 @@ export default function Run() {
               return (
                 <tr key={i}>
                   <td>{nm}</td>
-                  {s.rebuys && <td><span className="cnt"><button onClick={() => setRebuy(i, -1)}>−</button>{live.rebuys[i] || 0}<button onClick={() => setRebuy(i, 1)}>+</button></span></td>}
+                  {s.rebuys && (() => {
+                    const cur = live.rebuys[i] || 0
+                    const capped = (!!s.maxRebuysPerPlayer && cur >= s.maxRebuysPerPlayer) || (!!s.maxRebuysTotal && totalRebuys >= s.maxRebuysTotal)
+                    return <td><span className="cnt"><button onClick={() => setRebuy(i, -1)} disabled={cur === 0}>−</button>{cur}<button onClick={() => setRebuy(i, 1)} disabled={capped} title={capped ? 'No rebuys left' : ''}>+</button></span></td>
+                  })()}
                   {s.addOns && <td><input type="checkbox" checked={!!live.addOns[i]} onChange={() => toggleAddOn(i)} /></td>}
                   {s.payoutMode === 'tournament'
                     ? <td className="right">{place ? `${ord(place)}${place <= payouts.length ? ` · ${money(payouts[place - 1])}` : ''}` : <button onClick={() => knockOut(i)} style={{ fontSize: 12, padding: '4px 12px' }}>Knock out</button>}</td>

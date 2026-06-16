@@ -12,7 +12,8 @@ export interface Setup {
   players: number              // 2..24 (slider)
   startingStack: number
   rebuys: boolean
-  rebuysPerPlayer: number      // expected avg — for chip planning only
+  maxRebuysTotal: number       // global pool of rebuys; when exhausted, no more
+  maxRebuysPerPlayer: number   // cap per player
   addOns: boolean
   addOnValue: number           // chip value of one add-on
   speed: Speed
@@ -37,7 +38,8 @@ export const DEFAULT_SETUP: Setup = {
   players: 12,
   startingStack: 2500,
   rebuys: true,
-  rebuysPerPlayer: 1.5,
+  maxRebuysTotal: 10,
+  maxRebuysPerPlayer: 2,
   addOns: false,
   addOnValue: 2500,
   speed: 'normal',

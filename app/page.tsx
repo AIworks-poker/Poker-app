@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
-import { planChips, playerStacks, padelApplies } from '@/lib/chips'
+import { planChips, playerStacks, padelApplies, chipBreakdown } from '@/lib/chips'
 import { generateBlinds, totalDuration, type Speed } from '@/lib/blinds'
 import { prizePool, tournamentPayouts, formatMoney } from '@/lib/money'
 import { type Setup, DEFAULT_SETUP, MAX_PLAYERS, normalizeNames, SETUP_KEY, EDITING_KEY } from '@/lib/setup'
@@ -41,8 +41,8 @@ export default function Home() {
   const setPlayers = (n: number) => setS(p => ({ ...p, players: n, names: normalizeNames(p.names, n) }))
 
   const plan = useMemo(
-    () => planChips(s.inventory, { players: s.players, rebuysPerPlayer: s.rebuys ? s.rebuysPerPlayer : 0, addOnsPerPlayer: s.addOns ? 1 : 0 }),
-    [s.inventory, s.players, s.rebuys, s.rebuysPerPlayer, s.addOns],
+    () => planChips(s.inventory, { players: s.players, rebuysPerPlayer: s.rebuys ? s.maxRebuysTotal / s.players : 0, addOnsPerPlayer: s.addOns ? 1 : 0 }),
+    [s.inventory, s.players, s.rebuys, s.maxRebuysTotal, s.addOns],
   )
   const stacks = useMemo(() => playerStacks(s.players, plan.stackValue, s.padel), [s.players, plan.stackValue, s.padel])
   const blinds = useMemo(
@@ -54,7 +54,7 @@ export default function Home() {
   // estimated pool (assumes rebuysPerPlayer avg + 1 add-on/player if enabled) — live tally happens on /run
   const estPool = useMemo(() => prizePool({
     players: s.players, buyInPrice: s.buyInPrice,
-    rebuys: s.rebuys ? Math.round(s.players * s.rebuysPerPlayer) : 0, rebuyPrice: s.rebuyPrice,
+    rebuys: s.rebuys ? s.maxRebuysTotal : 0, rebuyPrice: s.rebuyPrice,
     addOns: s.addOns ? s.players : 0, addOnPrice: s.addOnPrice,
   }), [s])
   const estPayouts = useMemo(() => tournamentPayouts(estPool, s.payoutSplit), [estPool, s.payoutSplit])
@@ -144,7 +144,8 @@ export default function Home() {
         </div>
         <div className="row">
           <label className="toggle"><input type="checkbox" checked={s.rebuys} onChange={e => set('rebuys', e.target.checked)} /> Rebuys</label>
-          {s.rebuys && <label>per player (avg)<input type="number" min={0} max={5} step={0.5} value={s.rebuysPerPlayer} onChange={e => set('rebuysPerPlayer', +e.target.value || 0)} /></label>}
+          {s.rebuys && <label>max total<input type="number" min={0} value={s.maxRebuysTotal} onChange={e => set('maxRebuysTotal', +e.target.value || 0)} /></label>}
+          {s.rebuys && <label>max per player<input type="number" min={0} value={s.maxRebuysPerPlayer} onChange={e => set('maxRebuysPerPlayer', +e.target.value || 0)} /></label>}
           <label className="toggle"><input type="checkbox" checked={s.addOns} onChange={e => set('addOns', e.target.checked)} /> Add-ons</label>
           {s.addOns && <label>add-on chips<input type="number" min={0} step={100} value={s.addOnValue} onChange={e => set('addOnValue', +e.target.value || 0)} /></label>}
           <label className="toggle"><input type="checkbox" checked={s.antes} onChange={e => set('antes', e.target.checked)} /> Antes</label>
@@ -244,11 +245,21 @@ export default function Home() {
         <h2 style={{ margin: '0 0 8px' }}>Starting stacks {padelOn ? '(padel head-start ON)' : '(flat)'}</h2>
         {padelOn ? (
           <table>
-            <thead><tr><th>Finish</th><th>Bonus</th><th className="right">Total</th></tr></thead>
+            <thead><tr><th>Finish</th><th>Bonus</th><th>Chips to add (on top)</th><th className="right">Total</th></tr></thead>
             <tbody>
-              {stacks.map(st => (
-                <tr key={st.rank}><td>{st.rank === 1 ? '🏆 1st' : `${st.rank}${st.rank === 2 ? 'nd' : st.rank === 3 ? 'rd' : 'th'}`}</td><td>+{st.bonus}</td><td className="right">{fmt(st.total)}</td></tr>
-              ))}
+              {stacks.map(st => {
+                const bd = chipBreakdown(st.bonus, plan.values)
+                return (
+                  <tr key={st.rank}>
+                    <td>{st.rank === 1 ? '🏆 1st' : `${st.rank}${st.rank === 2 ? 'nd' : st.rank === 3 ? 'rd' : 'th'}`}</td>
+                    <td>+{st.bonus}</td>
+                    <td>{bd.length === 0 ? '—' : bd.map((c, k) => (
+                      <span key={c.name} style={{ whiteSpace: 'nowrap' }}>{k > 0 ? ' · ' : ''}<span className="chip" style={{ background: CHIP_CSS[c.name] ?? '#888' }} />{c.count}× {c.name}</span>
+                    ))}</td>
+                    <td className="right">{fmt(st.total)}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         ) : (

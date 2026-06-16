@@ -91,6 +91,24 @@ export function planChips(inventory: ChipColor[], opts: ChipOpts): ChipPlan {
   }
 }
 
+export interface ChipCount { name: string; value: number; count: number }
+
+/** Greedily decompose an amount into the available denominations, biggest
+ *  first — i.e. "which chips to physically hand out" for a given value. */
+export function chipBreakdown(amount: number, values: Record<string, number>): ChipCount[] {
+  const denoms = Object.entries(values)
+    .map(([name, value]) => ({ name, value }))
+    .filter(d => d.value > 0)
+    .sort((a, b) => b.value - a.value)
+  let rem = amount
+  const out: ChipCount[] = []
+  for (const d of denoms) {
+    const count = Math.floor(rem / d.value)
+    if (count > 0) { out.push({ name: d.name, value: d.value, count }); rem -= count * d.value }
+  }
+  return out
+}
+
 /* ── Padel head-start (OPTIONAL — only when a padel tournament feeds the poker
  *    seeding; padel needs multiples of 4). Poker alone uses flat stacks. ──── */
 
