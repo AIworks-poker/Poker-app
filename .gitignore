@@ -4,3 +4,7 @@
 next-env.d.ts
 *.tsbuildinfo
 .env*
+
+.b.log
+.npm.log
+.vercel
