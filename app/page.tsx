@@ -59,8 +59,30 @@ export default function Home() {
   }), [s])
   const estPayouts = useMemo(() => tournamentPayouts(estPool, s.payoutSplit), [estPool, s.payoutSplit])
 
+  // No-recycle feasibility: every base stack, every rebuy (fresh stack), every
+  // padel head-start and every add-on needs its own chips from the box — busted
+  // players' chips are NOT reused. Check total chip value vs what's needed.
+  const supply = useMemo(() => {
+    const valOf = (c: { name: string; value?: number }) => c.value ?? plan.values[c.name] ?? 0
+    const haveValue = s.inventory.reduce((a, c) => a + c.count * valOf(c), 0)
+    const padelBonusTotal = (s.padel && padelApplies(s.players)) ? stacks.reduce((a, st) => a + st.bonus, 0) : 0
+    const baseAndRebuys = (s.players + (s.rebuys ? s.maxRebuysTotal : 0)) * s.startingStack
+    const addOnValue = s.addOns ? s.players * s.addOnValue : 0
+    const neededValue = baseAndRebuys + padelBonusTotal + addOnValue
+    return { haveValue, neededValue, padelBonusTotal, fits: haveValue >= neededValue }
+  }, [s, plan.values, stacks])
+
   function updInv(i: number, field: 'count' | 'value', v: number) {
     setS(p => ({ ...p, inventory: p.inventory.map((c, j) => j === i ? { ...c, [field]: v } : c) }))
+  }
+  function updName(i: number, name: string) {
+    setS(p => ({ ...p, inventory: p.inventory.map((c, j) => j === i ? { ...c, name } : c) }))
+  }
+  function addColor() {
+    setS(p => ({ ...p, inventory: [...p.inventory, { name: `Colour ${p.inventory.length + 1}`, count: 100, value: 5 }] }))
+  }
+  function removeColor(i: number) {
+    setS(p => ({ ...p, inventory: p.inventory.filter((_, j) => j !== i) }))
   }
   function setSplit(i: number, v: number) {
     setS(p => ({ ...p, payoutSplit: p.payoutSplit.map((x, j) => j === i ? v : x) }))
@@ -206,22 +228,27 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Chip inventory */}
+      {/* Chip inventory — fully editable: rename / count / value / add / remove */}
       <div className="card">
         <h2 style={{ margin: '0 0 8px' }}>Chips</h2>
         <table>
-          <thead><tr><th>Colour</th><th>Have</th><th>Value</th><th className="right">Per stack</th></tr></thead>
+          <thead><tr><th>Colour</th><th>Have</th><th>Value</th><th className="right">Per stack</th><th></th></tr></thead>
           <tbody>
             {s.inventory.map((c, i) => (
-              <tr key={c.name}>
-                <td><span className="chip" style={{ background: CHIP_CSS[c.name] ?? '#888' }} />{c.name}</td>
+              <tr key={i}>
+                <td><span className="chip" style={{ background: CHIP_CSS[c.name] ?? '#888' }} /><input value={c.name} style={{ width: 100 }} onChange={e => updName(i, e.target.value)} /></td>
                 <td><input type="number" min={0} value={c.count} onChange={e => updInv(i, 'count', +e.target.value || 0)} /></td>
                 <td><input type="number" min={1} value={c.value ?? plan.values[c.name] ?? 0} onChange={e => updInv(i, 'value', +e.target.value || 0)} /></td>
                 <td className="right">{plan.perStack[c.name] ?? 0}</td>
+                <td className="right"><button onClick={() => removeColor(i)} title="Remove" style={{ padding: '4px 10px', fontSize: 12 }}>✕</button></td>
               </tr>
             ))}
           </tbody>
         </table>
+        <div className="row" style={{ marginTop: 8 }}>
+          <button onClick={addColor}>+ Add colour</button>
+          <span className="muted" style={{ fontSize: 11 }}>Set each colour's value freely (e.g. Purple 10, White 500). The most numerous colour is usually the smallest denomination.</span>
+        </div>
       </div>
 
       {/* Preview */}
@@ -238,6 +265,20 @@ export default function Home() {
         {s.payoutMode === 'tournament' && estPayouts.length > 0 && (
           <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>Est. winner receives <b style={{ color: 'var(--accent)' }}>{formatMoney(estPayouts[0], s.currency)}</b>{estPayouts.length > 1 ? ` · ${estPayouts.slice(1).map(p => formatMoney(p, s.currency)).join(' · ')}` : ''}</p>
         )}
+      </div>
+
+      {/* Chip-supply feasibility (no recycling) */}
+      <div className="card" style={{ borderColor: supply.fits ? 'var(--accent)' : '#ff1f1f' }}>
+        <p style={{ margin: 0, fontWeight: 700, color: supply.fits ? 'var(--accent)' : '#ff5b5b' }}>
+          {supply.fits ? '✓ Your chips cover the night' : `✗ Short ${fmt(supply.neededValue - supply.haveValue)} in chip value`}
+        </p>
+        <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>
+          Need <b style={{ color: 'var(--text)' }}>{fmt(supply.neededValue)}</b> · have <b style={{ color: 'var(--text)' }}>{fmt(supply.haveValue)}</b>.
+          {' '}{s.players} stacks{s.rebuys ? ` + ${s.maxRebuysTotal} rebuys` : ''} × {fmt(s.startingStack)}
+          {supply.padelBonusTotal ? ` + ${fmt(supply.padelBonusTotal)} padel head-start` : ''}
+          {s.addOns ? ` + ${s.players} add-ons × ${fmt(s.addOnValue)}` : ''} (no recycling — every rebuy is a fresh stack).
+          {!supply.fits && ' Raise chip values / counts, lower the stack, or cut rebuys.'}
+        </p>
       </div>
 
       {/* Starting stacks */}

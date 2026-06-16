@@ -12,7 +12,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { generateBlinds, type BlindLevel } from '@/lib/blinds'
-import { prizePool, tournamentPayouts, cashRate, formatMoney } from '@/lib/money'
+import { playerStacks, padelApplies } from '@/lib/chips'
+import { prizePool, tournamentPayouts, formatMoney } from '@/lib/money'
 import { type Setup, DEFAULT_SETUP, normalizeNames, loadSetup, LIVE_KEY } from '@/lib/setup'
 
 type Phase = 'level' | 'grace' | 'over'
@@ -81,7 +82,11 @@ export default function Run() {
   const totalAddOns = live.addOns.filter(Boolean).length
   const pool = prizePool({ players: s.players, buyInPrice: s.buyInPrice, rebuys: totalRebuys, rebuyPrice: s.rebuyPrice, addOns: totalAddOns, addOnPrice: s.addOnPrice })
   const payouts = tournamentPayouts(pool, s.payoutSplit)
-  const rate = cashRate(s.buyInPrice, s.startingStack)
+  // cash game: every chip is worth pool ÷ all chips in play — so the free padel
+  // head-start chips carry value, yet all cash-outs still sum to the pool.
+  const padelBonusTotal = s.padel && padelApplies(s.players) ? playerStacks(s.players, 0, true).reduce((a, st) => a + st.bonus, 0) : 0
+  const totalChipsInPlay = s.players * s.startingStack + padelBonusTotal + totalRebuys * s.startingStack + totalAddOns * s.addOnValue
+  const rate = totalChipsInPlay > 0 ? pool / totalChipsInPlay : 0
   const money = (n: number) => formatMoney(n, s.currency)
 
   // tournament finishing places from elimination order (first out = last place)
@@ -210,7 +215,7 @@ export default function Run() {
             })}
           </tbody>
         </table>
-        {s.payoutMode === 'cash' && <p className="muted" style={{ fontSize: 11, marginTop: 8 }}>Cash = final chips × {rate.toFixed(3)} {s.currency} (buy-in ÷ starting stack). Enter each player's final stack above.</p>}
+        {s.payoutMode === 'cash' && <p className="muted" style={{ fontSize: 11, marginTop: 8 }}>Cash = final chips × {rate.toFixed(3)} {s.currency} (prize pool ÷ all {totalChipsInPlay.toLocaleString()} chips in play — padel head-start chips included). Enter each player's final stack above; they should sum to {totalChipsInPlay.toLocaleString()}.</p>}
       </div>
 
       <p className="muted" style={{ fontSize: 11, marginTop: 20, textAlign: 'center' }}>No accounts, no cookies, no tracking. We never log your IP.</p>
