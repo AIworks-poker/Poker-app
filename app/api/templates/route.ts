@@ -27,6 +27,17 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true, id })
 }
 
+// Admin only: overwrite an existing template (edit, no duplicate).
+export async function PATCH(req: NextRequest) {
+  if (!currentAdmin()) return NextResponse.json({ ok: false }, { status: 401 })
+  const { id, name, config } = await req.json().catch(() => ({})) as { id?: string; name?: string; config?: unknown }
+  if (!id || !name || typeof config !== 'object') return NextResponse.json({ ok: false, error: 'id + name + config required' }, { status: 400 })
+  await ensureSchema()
+  const r = await db().query('UPDATE templates SET name=$2, config=$3, updated_at=now() WHERE id=$1', [id, name.slice(0, 60), config])
+  if (r.rowCount === 0) return NextResponse.json({ ok: false, error: 'not found' }, { status: 404 })
+  return NextResponse.json({ ok: true, id })
+}
+
 // Admin only: delete a template by id (?id=).
 export async function DELETE(req: NextRequest) {
   if (!currentAdmin()) return NextResponse.json({ ok: false }, { status: 401 })

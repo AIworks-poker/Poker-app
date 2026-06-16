@@ -41,3 +41,34 @@ th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: upp
 .warn { color: var(--accent2); font-size: 12px; }
 .muted { color: var(--muted); }
 .right { text-align: right; }
+
+/* ── v1: template cards, slider, clock, leaderboard ─────────────────── */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.tcard { background: #0f141b; border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.tcard h3 { margin: 0; font-size: 15px; }
+.tcard .meta { font-size: 11px; color: var(--muted); line-height: 1.6; }
+.tcard .acts { display: flex; gap: 6px; margin-top: auto; }
+.tcard .acts button { padding: 5px 12px; font-size: 12px; }
+.banner { background: #1d2735; border: 1px solid var(--accent); border-radius: 12px; padding: 12px 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.banner b { color: var(--text); }
+input[type=range] { width: 220px; accent-color: var(--accent); padding: 0; }
+.names { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.names label { font-size: 11px; }
+.names input { width: 100%; }
+
+/* clock / run screen */
+.clock { text-align: center; padding: 18px 12px 26px; }
+.clock .lvl { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.clock .time { font-size: clamp(64px, 18vw, 130px); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; margin: 6px 0; }
+.clock .time.grace { color: var(--accent2); }
+.clock .time.over { color: var(--accent); }
+.clock .blinds { font-size: clamp(22px, 6vw, 36px); font-weight: 700; }
+.clock .ante { font-size: 14px; color: var(--muted); margin-top: 4px; }
+.clock .next { font-size: 12px; color: var(--muted); margin-top: 10px; }
+.clock .ctrls { display: flex; gap: 10px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
+.clock .ctrls button { padding: 12px 22px; font-size: 15px; }
+.leader td .pos { display: inline-block; min-width: 22px; font-weight: 700; }
+.leader tr.win td { color: var(--accent); font-weight: 700; }
+.cnt { display: inline-flex; align-items: center; gap: 8px; }
+.cnt button { width: 30px; height: 30px; padding: 0; font-size: 16px; line-height: 1; }
+.split-in { width: 56px !important; }
