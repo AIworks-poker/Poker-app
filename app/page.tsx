@@ -192,7 +192,7 @@ export default function Home() {
         </table>
       </div>
 
-      <p className="muted" style={{ fontSize: 11, marginTop: 20 }}>No accounts, no cookies, no tracking. We never log your IP.</p>
+      <p className="muted" style={{ fontSize: 11, marginTop: 20, textAlign: 'center' }}>No accounts, no cookies, no tracking. We never log your IP.</p>
     </main>
   )
 }
