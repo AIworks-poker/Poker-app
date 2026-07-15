@@ -14,15 +14,16 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { generateBlinds, type BlindLevel } from '@/lib/blinds'
 import { playerStacks, padelApplies } from '@/lib/chips'
 import { prizePool, tournamentPayouts, formatMoney } from '@/lib/money'
-import { type Setup, DEFAULT_SETUP, normalizeNames, loadSetup, LIVE_KEY } from '@/lib/setup'
+import { type Setup, normalizeNames, loadSetup, LIVE_KEY } from '@/lib/setup'
+import { useLang } from '@/lib/i18n'
 
 type Phase = 'level' | 'grace' | 'over'
 interface Live { rebuys: number[]; addOns: boolean[]; out: number[]; finalChips: number[] }
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
-const ord = (n: number) => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'}`
 
 export default function Run() {
+  const { t } = useLang()
   const [s, setS] = useState<Setup | null>(null)
   const [live, setLive] = useState<Live>({ rebuys: [], addOns: [], out: [], finalChips: [] })
   const [clock, setClock] = useState<{ idx: number; phase: Phase; secondsLeft: number }>({ idx: 0, phase: 'level', secondsLeft: 0 })
@@ -73,13 +74,11 @@ export default function Run() {
     () => s ? generateBlinds({ startingStack: s.startingStack, players: s.players, speed: s.speed, antes: s.antes, graceSeconds: s.graceSeconds, breakEvery: 4, levels: 16 }) : [],
     [s],
   )
-  // initialise the clock once blinds exist
   useEffect(() => { if (blinds.length && clock.secondsLeft === 0 && clock.idx === 0 && clock.phase === 'level') setClock(c => ({ ...c, secondsLeft: blinds[0].durationMin * 60 })) }, [blinds]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // tick
   useEffect(() => {
     if (!running || !blinds.length) return
-    const t = setInterval(() => {
+    const tick = setInterval(() => {
       setClock(c => {
         if (c.secondsLeft > 1) return { ...c, secondsLeft: c.secondsLeft - 1 }
         const row = blinds[c.idx]
@@ -89,20 +88,19 @@ export default function Run() {
         return { idx: next, phase: 'level', secondsLeft: blinds[next].durationMin * 60 }
       })
     }, 1000)
-    return () => clearInterval(t)
+    return () => clearInterval(tick)
   }, [running, blinds])
   useEffect(() => { if (clock.phase === 'over') setRunning(false) }, [clock.phase])
-  // buzzer when a new (non-break) level begins — blinds just went up
   useEffect(() => {
     const r = blinds[clock.idx]
     if (clock.phase === 'level' && clock.idx !== prevLevelIdx.current && clock.idx > 0 && r && !r.isBreak && sound) playBuzzer()
     prevLevelIdx.current = clock.idx
   }, [clock.idx, clock.phase]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!s) return <main className="wrap"><p className="muted">Loading…</p></main>
-  if (!s.players) return <main className="wrap"><p>Nothing set up yet. <a href="/">Configure a tournament →</a></p></main>
+  if (!s) return <main className="wrap"><p className="muted">{t.loading}</p></main>
+  if (!s.players) return <main className="wrap"><p>{t.nothingSetUp} <a href="/">{t.configure}</a></p></main>
 
-  const names = normalizeNames(s.names, s.players).map((n, i) => n.trim() || `Player ${i + 1}`)
+  const names = normalizeNames(s.names, s.players).map((n, i) => n.trim() || t.playerPh(i + 1))
   const row = blinds[clock.idx]
   const nextRow = blinds[clock.idx + 1]
 
@@ -115,14 +113,11 @@ export default function Run() {
   const totalAddOns = live.addOns.filter(Boolean).length
   const pool = prizePool({ players: s.players, buyInPrice: s.buyInPrice, rebuys: totalRebuys, rebuyPrice: s.rebuyPrice, addOns: totalAddOns, addOnPrice: s.addOnPrice })
   const payouts = tournamentPayouts(pool, s.payoutSplit)
-  // cash game: every chip is worth pool ÷ all chips in play — so the free padel
-  // head-start chips carry value, yet all cash-outs still sum to the pool.
   const padelBonusTotal = s.padel && padelApplies(s.players) ? playerStacks(s.players, 0, true).reduce((a, st) => a + st.bonus, 0) : 0
   const totalChipsInPlay = s.players * s.startingStack + padelBonusTotal + totalRebuys * s.startingStack + totalAddOns * s.addOnValue
   const rate = totalChipsInPlay > 0 ? pool / totalChipsInPlay : 0
   const money = (n: number) => formatMoney(n, s.currency)
 
-  // tournament finishing places from elimination order (first out = last place)
   const placeOf = (i: number) => { const k = live.out.indexOf(i); return k < 0 ? null : s.players - k }
   const aliveIdx = Array.from({ length: s.players }, (_, i) => i).filter(i => !live.out.includes(i))
   const winnerIdx = aliveIdx.length === 1 ? aliveIdx[0] : null
@@ -143,7 +138,6 @@ export default function Run() {
   function toggleOut(i: number) { setLive(l => l.out.includes(i) ? { ...l, out: l.out.filter(x => x !== i) } : { ...l, out: [...l.out, i] }) }
   function setFinal(i: number, v: number) { setLive(l => ({ ...l, finalChips: l.finalChips.map((x, j) => j === i ? v : x) })) }
 
-  // standings for the leaderboard
   const standings = Array.from({ length: s.players }, (_, i) => i).map(i => {
     if (s.payoutMode === 'cash') { const cash = Math.round((live.finalChips[i] || 0) * rate); return { i, sortKey: cash, cash } }
     const place = i === winnerIdx ? 1 : placeOf(i)
@@ -154,55 +148,55 @@ export default function Run() {
   return (
     <main className="wrap">
       <div className="row" style={{ justifyContent: 'space-between' }}>
-        <a href="/"><button>← Setup</button></a>
-        <button onClick={() => { if (confirm('Clear live data (rebuys, add-ons, knockouts)?')) setLive({ rebuys: pad([], s.players, 0), addOns: pad([], s.players, false), out: [], finalChips: pad([], s.players, 0) }) }}>Reset live data</button>
+        <a href="/"><button>{t.setup}</button></a>
+        <button onClick={() => { if (confirm(t.confirmResetLive)) setLive({ rebuys: pad([], s.players, 0), addOns: pad([], s.players, false), out: [], finalChips: pad([], s.players, 0) }) }}>{t.resetLive}</button>
       </div>
 
       {/* Clock */}
       <div className="card clock">
-        <div className="lvl">{clock.phase === 'over' ? 'Tournament complete' : row?.isBreak ? 'Break' : clock.phase === 'grace' ? 'Get settled — next level in' : `Level ${row?.level}`}</div>
+        <div className="lvl">{clock.phase === 'over' ? t.complete : row?.isBreak ? t.breakLbl : clock.phase === 'grace' ? t.getSettled : t.levelN(row?.level ?? 0)}</div>
         <div className={`time ${clock.phase === 'grace' ? 'grace' : clock.phase === 'over' ? 'over' : ''}`}>{clock.phase === 'over' ? '✓' : mmss(clock.secondsLeft)}</div>
         {clock.phase !== 'over' && !row?.isBreak && (
           <>
             <div className="blinds">{row?.smallBlind.toLocaleString()} / {row?.bigBlind.toLocaleString()}</div>
-            {row?.ante ? <div className="ante">ante {row.ante.toLocaleString()}</div> : null}
+            {row?.ante ? <div className="ante">{t.colAnte.toLowerCase()} {row.ante.toLocaleString()}</div> : null}
           </>
         )}
         {nextRow && clock.phase !== 'over' && (
-          <div className="next">Next: {nextRow.isBreak ? 'Break' : `L${nextRow.level} — ${nextRow.smallBlind.toLocaleString()}/${nextRow.bigBlind.toLocaleString()}`}</div>
+          <div className="next">{t.next(nextRow.isBreak ? t.nextBreak : t.nextLevel(nextRow.level ?? 0, `${nextRow.smallBlind.toLocaleString()}/${nextRow.bigBlind.toLocaleString()}`))}</div>
         )}
         <div className="ctrls">
-          <button onClick={() => advance(-1)}>⏮ Prev</button>
-          <button className="primary" onClick={() => { if (!running) ensureAudio(); setRunning(r => !r) }} disabled={clock.phase === 'over'}>{running ? '⏸ Pause' : '▶ Start'}</button>
-          <button onClick={() => advance(1)}>Next ⏭</button>
-          <button onClick={resetClock}>↺ Reset</button>
-          <button onClick={() => { setSound(v => !v); ensureAudio() }} title={sound ? 'Mute buzzer' : 'Unmute buzzer'}>{sound ? '🔊' : '🔇'}</button>
+          <button onClick={() => advance(-1)}>{t.cPrev}</button>
+          <button className="primary" onClick={() => { if (!running) ensureAudio(); setRunning(r => !r) }} disabled={clock.phase === 'over'}>{running ? t.cPause : t.cStart}</button>
+          <button onClick={() => advance(1)}>{t.cNext}</button>
+          <button onClick={resetClock}>{t.cReset}</button>
+          <button onClick={() => { setSound(v => !v); ensureAudio() }} title={sound ? t.mute : t.unmute}>{sound ? '🔊' : '🔇'}</button>
         </div>
       </div>
 
       {/* Prize pool */}
       <div className="card">
         <div className="kpi">
-          <div><b>{money(pool)}</b><span>prize pool</span></div>
-          <div><b>{s.players}</b><span>players</span></div>
-          {s.rebuys && <div><b>{totalRebuys}{s.maxRebuysTotal ? `/${s.maxRebuysTotal}` : ''}</b><span>rebuys used</span></div>}
-          {s.addOns && <div><b>{totalAddOns}</b><span>add-ons</span></div>}
+          <div><b>{money(pool)}</b><span>{t.kpiPrizePool}</span></div>
+          <div><b>{s.players}</b><span>{t.kpiPlayers}</span></div>
+          {s.rebuys && <div><b>{totalRebuys}{s.maxRebuysTotal ? `/${s.maxRebuysTotal}` : ''}</b><span>{t.kpiRebuysUsed}</span></div>}
+          {s.addOns && <div><b>{totalAddOns}</b><span>{t.kpiAddOns}</span></div>}
           {s.payoutMode === 'tournament'
-            ? <div><b>{money(payouts[0] ?? 0)}</b><span>winner gets</span></div>
-            : <div><b>{rate.toFixed(3)} {s.currency}</b><span>per chip</span></div>}
+            ? <div><b>{money(payouts[0] ?? 0)}</b><span>{t.kpiWinnerGets}</span></div>
+            : <div><b>{rate.toFixed(3)} {s.currency}</b><span>{t.kpiPerChip}</span></div>}
         </div>
       </div>
 
       {/* Roster + registration */}
       <div className="card">
-        <h2 style={{ margin: '0 0 8px' }}>Players</h2>
+        <h2 style={{ margin: '0 0 8px' }}>{t.rosterPlayers}</h2>
         <table>
           <thead>
             <tr>
-              <th>Player</th>
-              {s.rebuys && <th>Rebuys{s.maxRebuysTotal ? ` (${Math.max(0, s.maxRebuysTotal - totalRebuys)} left)` : ''}</th>}
-              {s.addOns && <th>Add-on</th>}
-              {s.payoutMode === 'tournament' ? <th className="right">Busted?</th> : <th className="right">Final chips</th>}
+              <th>{t.colPlayer}</th>
+              {s.rebuys && <th>{s.maxRebuysTotal ? t.colRebuysLeft(Math.max(0, s.maxRebuysTotal - totalRebuys)) : t.colRebuys}</th>}
+              {s.addOns && <th>{t.colAddOn}</th>}
+              {s.payoutMode === 'tournament' ? <th className="right">{t.colBusted}</th> : <th className="right">{t.colFinalChips}</th>}
             </tr>
           </thead>
           <tbody>
@@ -214,25 +208,25 @@ export default function Run() {
                   {s.rebuys && (() => {
                     const cur = live.rebuys[i] || 0
                     const capped = (!!s.maxRebuysPerPlayer && cur >= s.maxRebuysPerPlayer) || (!!s.maxRebuysTotal && totalRebuys >= s.maxRebuysTotal)
-                    return <td><span className="cnt"><button onClick={() => setRebuy(i, -1)} disabled={cur === 0}>−</button>{cur}<button onClick={() => setRebuy(i, 1)} disabled={capped} title={capped ? 'No rebuys left' : ''}>+</button></span></td>
+                    return <td><span className="cnt"><button onClick={() => setRebuy(i, -1)} disabled={cur === 0}>−</button>{cur}<button onClick={() => setRebuy(i, 1)} disabled={capped} title={capped ? t.noRebuysLeft : ''}>+</button></span></td>
                   })()}
                   {s.addOns && <td><input type="checkbox" checked={!!live.addOns[i]} onChange={() => toggleAddOn(i)} /></td>}
                   {s.payoutMode === 'tournament'
-                    ? <td className="right"><label className="toggle" style={{ justifyContent: 'flex-end' }}><input type="checkbox" checked={live.out.includes(i)} onChange={() => toggleOut(i)} /> {place ? `${ord(place)}${place <= payouts.length ? ` · ${money(payouts[place - 1])}` : ''}` : 'in'}</label></td>
+                    ? <td className="right"><label className="toggle" style={{ justifyContent: 'flex-end' }}><input type="checkbox" checked={live.out.includes(i)} onChange={() => toggleOut(i)} /> {place ? `${t.ord(place)}${place <= payouts.length ? ` · ${money(payouts[place - 1])}` : ''}` : t.statusIn}</label></td>
                     : <td className="right"><input type="number" min={0} value={live.finalChips[i] || 0} onChange={e => setFinal(i, +e.target.value || 0)} /></td>}
                 </tr>
               )
             })}
           </tbody>
         </table>
-        {s.payoutMode === 'tournament' && <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>Tick a player when they bust. Finishing places fill from last upward; the last player left wins. Untick to undo.</p>}
+        {s.payoutMode === 'tournament' && <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>{t.bustHint}</p>}
       </div>
 
       {/* Leaderboard */}
       <div className="card">
-        <h2 style={{ margin: '0 0 8px' }}>Leaderboard</h2>
+        <h2 style={{ margin: '0 0 8px' }}>{t.leaderboard}</h2>
         <table className="leader">
-          <thead><tr><th>#</th><th>Player</th><th className="right">{s.payoutMode === 'cash' ? 'Cash' : 'Prize'}</th></tr></thead>
+          <thead><tr><th>{t.colRank}</th><th>{t.colPlayer}</th><th className="right">{s.payoutMode === 'cash' ? t.colCash : t.colPrize}</th></tr></thead>
           <tbody>
             {standings.map((st, r) => {
               const isWin = s.payoutMode === 'cash' ? r === 0 && st.cash! > 0 : st.place === 1
@@ -246,10 +240,10 @@ export default function Run() {
             })}
           </tbody>
         </table>
-        {s.payoutMode === 'cash' && <p className="muted" style={{ fontSize: 11, marginTop: 8 }}>Cash = final chips × {rate.toFixed(3)} {s.currency} (prize pool ÷ all {totalChipsInPlay.toLocaleString()} chips in play — padel head-start chips included). Enter each player's final stack above; they should sum to {totalChipsInPlay.toLocaleString()}.</p>}
+        {s.payoutMode === 'cash' && <p className="muted" style={{ fontSize: 11, marginTop: 8 }}>{t.cashNote(rate.toFixed(3), s.currency, totalChipsInPlay.toLocaleString())}</p>}
       </div>
 
-      <p className="muted" style={{ fontSize: 11, marginTop: 20, textAlign: 'center' }}>No accounts, no cookies, no tracking. We never log your IP.</p>
+      <p className="muted" style={{ fontSize: 11, marginTop: 20, textAlign: 'center' }}>{t.footer}</p>
     </main>
   )
 }

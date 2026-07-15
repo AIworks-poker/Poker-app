@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import AdminBadge from './AdminBadge'
+import { LangProvider, LangSwitch } from '@/lib/i18n'
 
 export const metadata: Metadata = {
   title: 'Poker Tournament Planner',
@@ -10,7 +11,13 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body><AdminBadge />{children}</body>
+      <body>
+        <LangProvider>
+          <LangSwitch />
+          <AdminBadge />
+          {children}
+        </LangProvider>
+      </body>
     </html>
   )
 }
