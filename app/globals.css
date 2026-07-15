@@ -74,14 +74,15 @@ input[type=range] { width: 220px; accent-color: var(--accent); padding: 0; }
 .split-in { width: 56px !important; }
 
 /* admin "logged in" marker — bright red B, tucked just below the lang toggle */
-.admin-badge { position: fixed; top: 46px; right: 14px; z-index: 1000; width: 34px; height: 34px;
+.admin-badge { position: fixed; top: 46px; right: max(16px, calc(50vw - 460px)); z-index: 1000; width: 34px; height: 34px;
   display: flex; align-items: center; justify-content: center; border-radius: 50%;
   background: transparent; color: #ff1f1f; font-weight: 900; font-size: 26px; text-decoration: none;
   text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
 .admin-badge:hover { color: #ff4b4b; }
 
-/* language switcher — top-right corner (inline with the title), every page */
-.lang-switch { position: fixed; top: 10px; right: 12px; z-index: 1000; display: flex; gap: 2px;
+/* language switcher — top-right of the content column (aligns with the title,
+   not the far viewport edge on wide screens). .wrap is max-width 920 → half 460. */
+.lang-switch { position: fixed; top: 10px; right: max(16px, calc(50vw - 460px)); z-index: 1000; display: flex; gap: 2px;
   background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
 .lang-switch button { padding: 3px 9px; font-size: 11px; border: none; border-radius: 999px; background: transparent; color: var(--muted); }
 .lang-switch button.active { background: var(--accent); color: #06210f; }
