@@ -151,7 +151,7 @@ export default function Home() {
               )
             })}
           </div>
-          <p className="muted" style={{ fontSize: 11, marginTop: 8 }}>{t.editHint}<a href="/dealer">/dealer</a>.</p>
+          <p className="muted" style={{ fontSize: 11, marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>{t.editHint}<a href="/dealer"><button className="primary" style={{ padding: '4px 14px', fontSize: 12 }}>/dealer</button></a></p>
         </div>
       )}
       {msg && <p className="warn">{msg}</p>}
