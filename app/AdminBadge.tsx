@@ -2,7 +2,7 @@
 
 /**
  * A bright red "B" pinned to the top-right corner — visible on every page
- * ONLY while the single admin (bas@steinhauserovi.cz) is logged in. The session
+ * ONLY while the single admin (ADMIN_EMAIL) is logged in. The session
  * cookie is httpOnly, so we ask the server via /api/dealer/me. Click it to jump
  * to the dealer backstage.
  */

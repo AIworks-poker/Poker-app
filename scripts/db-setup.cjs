@@ -14,7 +14,23 @@ const crypto = require('crypto')
 // 2026-08-05 build-folder promotion moved the repo up a level.
 const KEYS = path.join(__dirname, '..', 'poker-vercel-env-keys.txt')
 const PWOUT = path.join(__dirname, '..', 'poker-dealer-password.txt')
-const ADMIN_EMAIL = 'bas@steinhauserovi.cz'
+
+/**
+ * The admin address is deployment configuration, not source — see the identical
+ * note in set-password.cjs. It was a literal here, publishing a personal address
+ * in a PUBLIC repo for no functional gain.
+ * Populate .env.local with: vercel env pull .env.local --environment=preview
+ */
+function adminEmail() {
+  const clean = (v) => v.trim().replace(/^["']|["']$/g, '')
+  if (process.env.ADMIN_EMAIL) return clean(process.env.ADMIN_EMAIL)
+  const envFile = path.join(__dirname, '..', '.env.local')
+  if (fs.existsSync(envFile)) {
+    const m = fs.readFileSync(envFile, 'utf8').match(/^ADMIN_EMAIL=(.*)$/m)
+    if (m && clean(m[1])) return clean(m[1])
+  }
+  throw new Error('ADMIN_EMAIL not set. Run: vercel env pull .env.local --environment=preview')
+}
 
 function parseKeys() {
   const raw = fs.readFileSync(KEYS, 'utf8')
@@ -31,7 +47,7 @@ function parseKeys() {
   return out
 }
 
-async function setup(name, url, hash) {
+async function setup(name, url, hash, admin) {
   const c = new Client({ connectionString: url, ssl: { rejectUnauthorized: false } })
   await c.connect()
   await c.query(`
@@ -45,7 +61,7 @@ async function setup(name, url, hash) {
   await c.query(
     `INSERT INTO admin_auth (id, email, password_hash) VALUES (1, $1, $2)
      ON CONFLICT (id) DO UPDATE SET email = $1, password_hash = $2`,
-    [ADMIN_EMAIL, hash])
+    [admin, hash])
   const t = (await c.query('SELECT count(*)::int n FROM templates')).rows[0].n
   await c.end()
   console.log(`  ${name}: schema ok, admin row set (${t} templates)`)
@@ -53,14 +69,15 @@ async function setup(name, url, hash) {
 
 ;(async () => {
   const keys = parseKeys()
+  const admin = adminEmail()
   // strong, readable temp password
   const pw = crypto.randomBytes(9).toString('base64').replace(/[+/=]/g, '').slice(0, 12)
   const hash = await bcrypt.hash(pw, 10)
   for (const [name, env] of [['PREVIEW', keys.preview], ['PRODUCTION', keys.production]]) {
     const url = env.DATABASE_URL_UNPOOLED || env.DATABASE_URL
     if (!url) { console.log(`  ${name}: no URL`); continue }
-    await setup(name, url, hash)
+    await setup(name, url, hash, admin)
   }
-  fs.writeFileSync(PWOUT, `Dealer login (poker app)\nURL:   /dealer\nEmail: ${ADMIN_EMAIL}\nPass:  ${pw}\n\nChange it later via /dealer -> Forgot password (once an email key is set),\nor re-run scripts/db-setup.cjs to reset to a new temp password.\n`)
+  fs.writeFileSync(PWOUT, `Dealer login (poker app)\nURL:   /dealer\nEmail: ${admin}\nPass:  ${pw}\n\nReset later by re-running scripts/db-setup.cjs (writes a new temp password here),\nor set one you choose with scripts/set-password.cjs.\n`)
   console.log('temp password written to ../poker-dealer-password.txt')
 })().catch(e => { console.error('FAIL:', e.message); process.exit(1) })

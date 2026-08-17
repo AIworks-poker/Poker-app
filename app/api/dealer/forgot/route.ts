@@ -5,9 +5,9 @@ import { log, route, readJson } from '@/lib/log'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// Forgot password: a reset link is ONLY ever sent to ADMIN_EMAIL
-// (bas@steinhauserovi.cz). Any other address gets the same generic response
-// and NO email — no enumeration, and no one else can ever receive mail.
+// Forgot password: a reset link is ONLY ever sent to the address in
+// ADMIN_EMAIL. Any other address gets the same generic response and NO email —
+// no enumeration, and no one else can ever receive mail.
 export const POST = route('dealer.forgot', async (req: NextRequest) => {
   const { email } = await readJson<{ email: string }>(req, 'dealer.forgot')
   const admin = process.env.ADMIN_EMAIL || ''

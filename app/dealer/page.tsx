@@ -5,7 +5,7 @@
  * Logged out: a minimal login + "forgot password". Logged in: save the current
  * planner setup as a template, and manage existing ones as cards — Edit loads a
  * template into the planner (and overwrites it on save, no duplicates), Delete
- * removes it. Only bas@steinhauserovi.cz can ever hold a session.
+ * removes it. Only the address in ADMIN_EMAIL can ever hold a session.
  */
 
 import { useEffect, useState } from 'react'

@@ -1,6 +1,6 @@
 /**
  * Single-admin session — HMAC-signed token in an httpOnly cookie.
- * Only bas@steinhauserovi.cz (ADMIN_EMAIL) can ever hold a session; there is
+ * Only the address in ADMIN_EMAIL can ever hold a session; there is
  * no signup. The cookie exists ONLY after the admin logs in at /dealer — the
  * public never receives one.
  */
