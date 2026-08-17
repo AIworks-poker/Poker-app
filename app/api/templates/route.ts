@@ -23,7 +23,7 @@ export const GET = route('templates.GET', async () => {
 
 // Admin only: save the current setup as a named template.
 export const POST = route('templates.POST', async (req: NextRequest) => {
-  if (!currentAdmin()) return NextResponse.json({ ok: false }, { status: 401 })
+  if (!(await currentAdmin())) return NextResponse.json({ ok: false }, { status: 401 })
   const { name, config } = await readJson<{ name: string; config: unknown }>(req, 'templates.POST')
   if (!name || typeof config !== 'object') return NextResponse.json({ ok: false, error: 'name + config required' }, { status: 400 })
   await ensureSchema()
@@ -35,7 +35,7 @@ export const POST = route('templates.POST', async (req: NextRequest) => {
 
 // Admin only: overwrite an existing template (edit, no duplicate).
 export const PATCH = route('templates.PATCH', async (req: NextRequest) => {
-  if (!currentAdmin()) return NextResponse.json({ ok: false }, { status: 401 })
+  if (!(await currentAdmin())) return NextResponse.json({ ok: false }, { status: 401 })
   const { id, name, config } = await readJson<{ id: string; name: string; config: unknown }>(req, 'templates.PATCH')
   if (!id || !name || typeof config !== 'object') return NextResponse.json({ ok: false, error: 'id + name + config required' }, { status: 400 })
   await ensureSchema()
@@ -50,7 +50,7 @@ export const PATCH = route('templates.PATCH', async (req: NextRequest) => {
 
 // Admin only: delete a template by id (?id=).
 export const DELETE = route('templates.DELETE', async (req: NextRequest) => {
-  if (!currentAdmin()) return NextResponse.json({ ok: false }, { status: 401 })
+  if (!(await currentAdmin())) return NextResponse.json({ ok: false }, { status: 401 })
   const id = new URL(req.url).searchParams.get('id')
   if (!id) return NextResponse.json({ ok: false }, { status: 400 })
   await ensureSchema()

@@ -23,7 +23,7 @@ export const POST = route('dealer.login', async (req: NextRequest) => {
   const row = (await db().query('SELECT password_hash FROM admin_auth WHERE id=1')).rows[0]
   if (!row?.password_hash) return fail('no-password-set')
   if (!(await bcrypt.compare(password, row.password_hash))) return fail('bad-password')
-  setSessionCookie(admin)
+  await setSessionCookie(admin)
   log.info('dealer.login.ok', {})
   return NextResponse.json({ ok: true })
 })

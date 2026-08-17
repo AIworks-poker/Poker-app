@@ -4,7 +4,7 @@ import { log, route } from '@/lib/log'
 export const runtime = 'nodejs'
 
 export const POST = route('dealer.logout', async () => {
-  clearSessionCookie()
+  await clearSessionCookie()
   log.info('dealer.logout.ok', {})
   return NextResponse.json({ ok: true })
 })

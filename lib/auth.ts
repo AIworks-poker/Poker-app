@@ -62,14 +62,20 @@ export function verifySessionToken(token: string | undefined): string | null {
   }
 }
 
-export function setSessionCookie(email: string) {
-  cookies().set(COOKIE, createSessionToken(email), {
+// Next 15 made cookies() async, so these three are async too — every caller
+// must await them. Forgetting the await on currentAdmin() would return a
+// Promise, which is truthy, and silently open a write endpoint to the public;
+// the return types below are what makes that a compile error instead.
+export async function setSessionCookie(email: string): Promise<void> {
+  (await cookies()).set(COOKIE, createSessionToken(email), {
     httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: MAX_AGE,
   })
 }
-export function clearSessionCookie() { cookies().set(COOKIE, '', { path: '/', maxAge: 0 }) }
+export async function clearSessionCookie(): Promise<void> {
+  (await cookies()).set(COOKIE, '', { path: '/', maxAge: 0 })
+}
 
 /** The logged-in admin email, or null. Use to gate every write endpoint. */
-export function currentAdmin(): string | null {
-  return verifySessionToken(cookies().get(COOKIE)?.value)
+export async function currentAdmin(): Promise<string | null> {
+  return verifySessionToken((await cookies()).get(COOKIE)?.value)
 }

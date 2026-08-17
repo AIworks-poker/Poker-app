@@ -6,5 +6,5 @@ export const dynamic = 'force-dynamic'
 
 // Is the current visitor the logged-in admin? (used by the AdminBadge.)
 export const GET = route('dealer.me', async () => {
-  return NextResponse.json({ admin: !!currentAdmin() }, { headers: { 'Cache-Control': 'no-store' } })
+  return NextResponse.json({ admin: !!(await currentAdmin()) }, { headers: { 'Cache-Control': 'no-store' } })
 })
