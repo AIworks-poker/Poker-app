@@ -7,11 +7,13 @@
  * to the dealer backstage.
  */
 import { useEffect, useState } from 'react'
+import { log } from '@/lib/log'
 
 export default function AdminBadge() {
   const [admin, setAdmin] = useState(false)
   useEffect(() => {
-    fetch('/api/dealer/me').then(r => r.json()).then(d => setAdmin(!!d.admin)).catch(() => {})
+    fetch('/api/dealer/me').then(r => r.json()).then(d => setAdmin(!!d.admin))
+      .catch(err => log.warn('adminBadge.checkFailed', { msg: String(err) }))
   }, [])
   if (!admin) return null
   return (

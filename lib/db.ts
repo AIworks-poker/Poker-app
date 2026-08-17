@@ -7,16 +7,22 @@
  * No visitor data, no IP, no analytics.
  */
 import { Pool } from 'pg'
+import { log } from './log'
 
 declare global { var _pgPool: Pool | undefined }
 
 export function db(): Pool {
   if (!global._pgPool) {
-    global._pgPool = new Pool({
+    if (!process.env.DATABASE_URL) log.error('db.noConnectionString', new Error('DATABASE_URL is not set'))
+    const pool = new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false },
       max: 3,
     })
+    // Errors on an idle client are emitted here and nowhere else — unhandled,
+    // they take the whole process down without ever explaining why.
+    pool.on('error', (err) => log.error('db.idleClientError', err))
+    global._pgPool = pool
   }
   return global._pgPool
 }

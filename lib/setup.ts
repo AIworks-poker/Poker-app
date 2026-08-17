@@ -6,6 +6,7 @@ import type { ChipColor } from './chips'
 import type { Speed } from './blinds'
 import type { PayoutMode } from './money'
 import { HOUSE_INVENTORY } from './presets'
+import { log } from './log'
 
 export interface Setup {
   inventory: ChipColor[]
@@ -75,6 +76,10 @@ export function loadSetup(): Setup {
   try {
     const v = localStorage.getItem(SETUP_KEY)
     if (v) return { ...DEFAULT_SETUP, ...JSON.parse(v) }
-  } catch {}
+  } catch (err) {
+    // Falling back to defaults is correct, but /run silently starting a night on
+    // DEFAULT_SETUP instead of the dealer's configuration is worth an error.
+    log.error('setup.loadFailed', err)
+  }
   return DEFAULT_SETUP
 }

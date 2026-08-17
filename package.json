@@ -10,10 +10,15 @@
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
-    "next": "14.2.5",
+    "next": "14.2.35",
     "pg": "^8.12.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
+  },
+  "_comment_overrides": "Transitive advisories inside next 14.2.x. Both are patch-level bumps within the same major that next already accepts; the alternative fix npm proposes is next@16 (breaking). Re-check on the next Next upgrade and drop if redundant.",
+  "overrides": {
+    "postcss": "^8.5.26",
+    "nanoid": "^3.3.18"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

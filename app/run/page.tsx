@@ -16,6 +16,7 @@ import { playerStacks, padelApplies } from '@/lib/chips'
 import { prizePool, tournamentPayouts, formatMoney } from '@/lib/money'
 import { type Setup, normalizeNames, loadSetup, LIVE_KEY } from '@/lib/setup'
 import { useLang } from '@/lib/i18n'
+import { log } from '@/lib/log'
 
 type Phase = 'level' | 'grace' | 'over'
 interface Live { rebuys: number[]; addOns: boolean[]; out: number[]; finalChips: number[] }
@@ -38,7 +39,11 @@ export default function Run() {
       if (!AC) return
       if (!acRef.current) acRef.current = new AC()
       if (acRef.current.state === 'suspended') acRef.current.resume()
-    } catch {}
+    } catch (err) {
+      // The clock must keep running without sound — but a silent buzzer that
+      // nobody can explain is exactly the bug this logging exists to catch.
+      log.warn('run.audioUnavailable', { msg: String(err) })
+    }
   }
   function playBuzzer() {
     ensureAudio()
@@ -61,14 +66,20 @@ export default function Run() {
     const setup = loadSetup()
     setS(setup)
     let l: Live | null = null
-    try { const v = localStorage.getItem(LIVE_KEY); if (v) l = JSON.parse(v) } catch {}
+    try { const v = localStorage.getItem(LIVE_KEY); if (v) l = JSON.parse(v) }
+    catch (err) { log.error('run.liveStateLoadFailed', err) }
     const n = setup.players
     setLive({
       rebuys: pad(l?.rebuys, n, 0), addOns: pad(l?.addOns, n, false),
       out: (l?.out ?? []).filter(i => i < n), finalChips: pad(l?.finalChips, n, 0),
     })
   }, [])
-  useEffect(() => { if (s) try { localStorage.setItem(LIVE_KEY, JSON.stringify(live)) } catch {} }, [live, s])
+  // Losing this write mid-tournament means rebuys/knock-outs vanish on refresh.
+  useEffect(() => {
+    if (!s) return
+    try { localStorage.setItem(LIVE_KEY, JSON.stringify(live)) }
+    catch (err) { log.error('run.liveStateSaveFailed', err) }
+  }, [live, s])
 
   const blinds: BlindLevel[] = useMemo(
     () => s ? generateBlinds({ startingStack: s.startingStack, players: s.players, speed: s.speed, antes: s.antes, graceSeconds: s.graceSeconds, breakEvery: 4, levels: 16 }) : [],

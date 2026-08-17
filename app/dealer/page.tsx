@@ -11,6 +11,7 @@
 import { useEffect, useState } from 'react'
 import { type Setup, DEFAULT_SETUP, SETUP_KEY, EDITING_KEY } from '@/lib/setup'
 import { useLang } from '@/lib/i18n'
+import { log } from '@/lib/log'
 
 interface Tmpl { id: string; name: string; config: Partial<Setup> }
 const fmt = (n: number) => (n ?? 0).toLocaleString('en-US')
@@ -25,42 +26,75 @@ export default function Dealer() {
   const [name, setName] = useState('')
 
   async function refresh() {
-    const r = await fetch('/api/templates').then(r => r.json()).catch(() => ({ templates: [] }))
+    const r = await fetch('/api/templates').then(r => r.json())
+      .catch(err => { log.error('dealer.templatesLoadFailed', err); return { templates: [] } })
     setTemplates(r.templates ?? [])
   }
   useEffect(() => { refresh() }, [])
 
   async function login(e: React.FormEvent) {
     e.preventDefault(); setMsg('')
-    const r = await fetch('/api/dealer/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: pw }) })
-    if (r.ok) { setAuthed(true); setPw('') } else { setMsg(t.loginFail) }
+    try {
+      const r = await fetch('/api/dealer/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: pw }) })
+      if (r.ok) { setAuthed(true); setPw('') } else { log.warn('dealer.loginRejected', { status: r.status }); setMsg(t.loginFail) }
+    } catch (err) {
+      log.error('dealer.loginFailed', err)
+      setMsg(t.loginFail)
+    }
   }
   async function forgot() {
     setMsg('')
-    await fetch('/api/dealer/forgot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) })
-    setMsg(t.forgotSent)
+    try {
+      await fetch('/api/dealer/forgot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) })
+    } catch (err) {
+      log.error('dealer.forgotFailed', err)
+    }
+    setMsg(t.forgotSent)   // always generic — no enumeration
   }
-  async function logout() { await fetch('/api/dealer/logout', { method: 'POST' }); setAuthed(false) }
+  async function logout() {
+    try { await fetch('/api/dealer/logout', { method: 'POST' }) }
+    catch (err) { log.error('dealer.logoutFailed', err) }
+    setAuthed(false)
+  }
 
   async function saveCurrent() {
     setMsg('')
     let config: unknown = {}
-    try { config = JSON.parse(localStorage.getItem(SETUP_KEY) || '{}') } catch {}
-    const r = await fetch('/api/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, config }) })
-    if (r.ok) { setName(''); setMsg(t.saved); refresh() }
-    else if (r.status === 401) { setAuthed(false); setMsg(t.sessionExpired) }
-    else setMsg(t.saveFailShort)
+    try { config = JSON.parse(localStorage.getItem(SETUP_KEY) || '{}') }
+    catch (err) { log.error('dealer.setupReadFailed', err) }
+    try {
+      const r = await fetch('/api/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, config }) })
+      if (r.ok) { setName(''); setMsg(t.saved); refresh() }
+      else if (r.status === 401) { setAuthed(false); setMsg(t.sessionExpired) }
+      else { log.error('dealer.saveRejected', new Error(`POST /api/templates → ${r.status}`), { status: r.status }); setMsg(t.saveFailShort) }
+    } catch (err) {
+      log.error('dealer.saveFailed', err)
+      setMsg(t.saveFailShort)
+    }
   }
   async function del(id: string) {
     if (!confirm(t.confirmDelete)) return
-    const r = await fetch(`/api/templates?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
-    if (r.ok) refresh(); else if (r.status === 401) setAuthed(false)
+    try {
+      const r = await fetch(`/api/templates?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+      if (r.ok) refresh()
+      else if (r.status === 401) setAuthed(false)
+      else log.error('dealer.deleteRejected', new Error(`DELETE /api/templates → ${r.status}`), { id, status: r.status })
+    } catch (err) {
+      log.error('dealer.deleteFailed', err, { id })
+    }
   }
   function edit(tm: Tmpl) {
     try {
       localStorage.setItem(SETUP_KEY, JSON.stringify({ ...DEFAULT_SETUP, ...tm.config }))
       localStorage.setItem(EDITING_KEY, JSON.stringify({ id: tm.id, name: tm.name }))
-    } catch {}
+    } catch (err) {
+      // The handoff to the planner rides on localStorage; if it failed, the
+      // planner will open with the PREVIOUS setup and "save" would overwrite
+      // the wrong template. Do not navigate on a broken handoff.
+      log.error('dealer.editHandoffFailed', err, { id: tm.id })
+      setMsg(t.saveFailShort)
+      return
+    }
     window.location.href = '/'
   }
 

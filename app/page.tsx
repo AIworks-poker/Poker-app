@@ -14,6 +14,7 @@ import { prizePool, tournamentPayouts, formatMoney } from '@/lib/money'
 import { padelCosts, padelSchedule } from '@/lib/padel'
 import { type Setup, DEFAULT_SETUP, MAX_PLAYERS, normalizeNames, SETUP_KEY, EDITING_KEY } from '@/lib/setup'
 import { useLang } from '@/lib/i18n'
+import { log } from '@/lib/log'
 
 const CHIP_CSS: Record<string, string> = {
   White: '#f4f4f4', Red: '#e74c3c', Blue: '#3498db', Black: '#222831',
@@ -30,16 +31,27 @@ export default function Home() {
   const [saved, setSaved] = useState<Tmpl[]>([])
   const [msg, setMsg] = useState('')
   const [admin, setAdmin] = useState(false)   // padel layer is visible only to the logged-in dealer
-  useEffect(() => { fetch('/api/dealer/me').then(r => r.json()).then(d => setAdmin(!!d.admin)).catch(() => {}) }, [])
-
-  // load persisted setup + any "edit this template" handoff from /dealer
   useEffect(() => {
-    try { const v = localStorage.getItem(SETUP_KEY); if (v) setS({ ...DEFAULT_SETUP, ...JSON.parse(v) }) } catch {}
-    try { const e = localStorage.getItem(EDITING_KEY); if (e) setEditing(JSON.parse(e)) } catch {}
+    fetch('/api/dealer/me').then(r => r.json()).then(d => setAdmin(!!d.admin))
+      .catch(err => log.warn('home.adminCheckFailed', { msg: String(err) }))
   }, [])
-  useEffect(() => { try { localStorage.setItem(SETUP_KEY, JSON.stringify(s)) } catch {} }, [s])
+
+  // load persisted setup + any "edit this template" handoff from /dealer.
+  // Storage failures stay non-fatal (private mode, quota) — the tool must still
+  // run — but they are no longer invisible.
   useEffect(() => {
-    fetch('/api/templates').then(r => r.json()).then(d => setSaved(d.templates ?? [])).catch(() => {})
+    try { const v = localStorage.getItem(SETUP_KEY); if (v) setS({ ...DEFAULT_SETUP, ...JSON.parse(v) }) }
+    catch (err) { log.warn('home.setupLoadFailed', { msg: String(err) }) }
+    try { const e = localStorage.getItem(EDITING_KEY); if (e) setEditing(JSON.parse(e)) }
+    catch (err) { log.warn('home.editingLoadFailed', { msg: String(err) }) }
+  }, [])
+  useEffect(() => {
+    try { localStorage.setItem(SETUP_KEY, JSON.stringify(s)) }
+    catch (err) { log.warn('home.setupSaveFailed', { msg: String(err) }) }
+  }, [s])
+  useEffect(() => {
+    fetch('/api/templates').then(r => r.json()).then(d => setSaved(d.templates ?? []))
+      .catch(err => log.error('home.templatesLoadFailed', err))
   }, [])
 
   const set = <K extends keyof Setup>(k: K, v: Setup[K]) => setS(p => ({ ...p, [k]: v }))
@@ -94,22 +106,41 @@ export default function Home() {
     setS({ ...DEFAULT_SETUP, ...tm.config, names: normalizeNames(tm.config.names ?? [], tm.config.players ?? DEFAULT_SETUP.players) })
     clearEditing(); setMsg(t.loaded(tm.name))
   }
-  function clearEditing() { setEditing(null); try { localStorage.removeItem(EDITING_KEY) } catch {} }
+  function clearEditing() {
+    setEditing(null)
+    try { localStorage.removeItem(EDITING_KEY) }
+    catch (err) { log.warn('home.clearEditingFailed', { msg: String(err) }) }
+  }
 
   async function saveChanges() {
     if (!editing) return
-    const r = await fetch('/api/templates', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editing.id, name: editing.name, config: s }) })
-    setMsg(r.ok ? t.saveChangedOk(editing.name) : t.saveFail)
-    if (r.ok) { clearEditing(); refresh() }
+    try {
+      const r = await fetch('/api/templates', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editing.id, name: editing.name, config: s }) })
+      if (!r.ok) log.error('home.saveChangesRejected', new Error(`PATCH /api/templates → ${r.status}`), { status: r.status })
+      setMsg(r.ok ? t.saveChangedOk(editing.name) : t.saveFail)
+      if (r.ok) { clearEditing(); refresh() }
+    } catch (err) {
+      log.error('home.saveChangesFailed', err)
+      setMsg(t.saveFail)
+    }
   }
   async function saveAsNew() {
     const name = prompt(t.promptName)?.trim()
     if (!name) return
-    const r = await fetch('/api/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, config: s }) })
-    setMsg(r.ok ? t.saveOk(name) : t.saveFail)
-    if (r.ok) refresh()
+    try {
+      const r = await fetch('/api/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, config: s }) })
+      if (!r.ok) log.error('home.saveNewRejected', new Error(`POST /api/templates → ${r.status}`), { status: r.status })
+      setMsg(r.ok ? t.saveOk(name) : t.saveFail)
+      if (r.ok) refresh()
+    } catch (err) {
+      log.error('home.saveNewFailed', err)
+      setMsg(t.saveFail)
+    }
   }
-  function refresh() { fetch('/api/templates').then(r => r.json()).then(d => setSaved(d.templates ?? [])).catch(() => {}) }
+  function refresh() {
+    fetch('/api/templates').then(r => r.json()).then(d => setSaved(d.templates ?? []))
+      .catch(err => log.error('home.templatesRefreshFailed', err))
+  }
 
   const padelOn = s.padel && padelApplies(s.players)
   const pCosts = padelCosts(s.players, s.courtPrice, s.ballPrice)
