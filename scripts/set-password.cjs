@@ -7,8 +7,10 @@ const path = require('path')
 const { Client } = require('pg')
 const bcrypt = require('bcryptjs')
 
-const KEYS = path.join(__dirname, '..', '..', 'poker-vercel-env-keys.txt')
-const PWIN = path.join(__dirname, '..', '..', 'poker-new-password.txt')
+// See db-setup.cjs: one level up from scripts/ is the repo root. Was '..','..'
+// (a leftover from the pre-2026-08-05 build-folder layout) until 2026-08-17.
+const KEYS = path.join(__dirname, '..', 'poker-vercel-env-keys.txt')
+const PWIN = path.join(__dirname, '..', 'poker-new-password.txt')
 const ADMIN_EMAIL = 'bas@steinhauserovi.cz'
 
 function parseKeys() {

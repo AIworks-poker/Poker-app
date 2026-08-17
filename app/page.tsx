@@ -15,6 +15,7 @@ import { padelCosts, padelSchedule } from '@/lib/padel'
 import { type Setup, DEFAULT_SETUP, MAX_PLAYERS, normalizeNames, SETUP_KEY, EDITING_KEY } from '@/lib/setup'
 import { useLang, type Dict } from '@/lib/i18n'
 import { log } from '@/lib/log'
+import { shareUrl, decodeSetup, SHARE_PARAM } from '@/lib/share'
 
 const CHIP_CSS: Record<string, string> = {
   White: '#f4f4f4', Red: '#e74c3c', Blue: '#3498db', Black: '#222831',
@@ -58,6 +59,7 @@ export default function Home() {
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null)
   const [saved, setSaved] = useState<Tmpl[]>([])
   const [msg, setMsg] = useState('')
+  const [sharedLoaded, setSharedLoaded] = useState(false)
   const [admin, setAdmin] = useState(false)   // padel layer is visible only to the logged-in dealer
   useEffect(() => {
     fetch('/api/dealer/me').then(r => r.json()).then(d => setAdmin(!!d.admin))
@@ -68,6 +70,19 @@ export default function Home() {
   // Storage failures stay non-fatal (private mode, quota) — the tool must still
   // run — but they are no longer invisible.
   useEffect(() => {
+    // A ?t= link wins over stored state: someone followed a shared setup and
+    // expects to see THAT. It is untrusted input, so it is merged over the
+    // defaults and the param is dropped from the address bar afterwards.
+    const shared = decodeSetup(new URLSearchParams(window.location.search).get(SHARE_PARAM))
+    if (shared) {
+      setS({ ...DEFAULT_SETUP, ...shared, names: normalizeNames([], shared.players ?? DEFAULT_SETUP.players) })
+      // Flag, not text: this effect runs before the stored language is applied,
+      // so capturing t.suggestLoaded here would pin the notice to the default
+      // language. Rendering from the flag keeps it in the language on screen.
+      setSharedLoaded(true)
+      window.history.replaceState({}, '', window.location.pathname)
+      return
+    }
     try { const v = localStorage.getItem(SETUP_KEY); if (v) setS({ ...DEFAULT_SETUP, ...JSON.parse(v) }) }
     catch (err) { log.warn('home.setupLoadFailed', { msg: String(err) }) }
     try { const e = localStorage.getItem(EDITING_KEY); if (e) setEditing(JSON.parse(e)) }
@@ -170,6 +185,26 @@ export default function Home() {
       .catch(err => log.error('home.templatesRefreshFailed', err))
   }
 
+  /**
+   * "Suggest a template": copy the current setup as a link. Nothing is sent
+   * anywhere — the dealer opens the link, reviews it, and saves it if they want
+   * it. That keeps template creation dealer-only while still letting anyone
+   * propose one. Player names are stripped by encodeSetup().
+   */
+  async function suggestTemplate() {
+    const url = shareUrl(s)
+    try {
+      await navigator.clipboard.writeText(url)
+      setMsg(t.suggestCopied)
+    } catch (err) {
+      // Clipboard needs a secure context and permission; on refusal fall back to
+      // a prompt so the visitor can still copy the link by hand.
+      log.warn('home.clipboardUnavailable', { msg: String(err) })
+      if (typeof window.prompt === 'function') window.prompt(t.suggest, url)
+      else setMsg(t.suggestFailed)
+    }
+  }
+
   const padelOn = s.padel && padelApplies(s.players)
   const pCosts = padelCosts(s.players, s.courtPrice, s.ballPrice)
   const scheme = padelSchedule(s.players)
@@ -222,7 +257,7 @@ export default function Home() {
           </div>
         </div>
       )}
-      {msg && <p className="warn">{msg}</p>}
+      {msg ? <p className="warn">{msg}</p> : sharedLoaded ? <p className="warn">{t.suggestLoaded}</p> : null}
 
       {/* Players + format */}
       <div className="card">
@@ -444,8 +479,9 @@ export default function Home() {
         </table>
       </div>
 
-      <div className="row" style={{ justifyContent: 'center', margin: '22px 0 6px' }}>
+      <div className="row" style={{ justifyContent: 'center', margin: '22px 0 6px', gap: 12, flexWrap: 'wrap' }}>
         <a href="/run"><button className="primary" style={{ padding: '14px 32px', fontSize: 16 }}>{t.startTournament}</button></a>
+        <button onClick={suggestTemplate} style={{ padding: '14px 24px', fontSize: 14 }}>{t.suggest}</button>
       </div>
 
       <p className="muted" style={{ fontSize: 11, marginTop: 20, textAlign: 'center' }}>{t.footer}</p>

@@ -8,8 +8,12 @@ const { Client } = require('pg')
 const bcrypt = require('bcryptjs')
 const crypto = require('crypto')
 
-const KEYS = path.join(__dirname, '..', '..', 'poker-vercel-env-keys.txt')
-const PWOUT = path.join(__dirname, '..', '..', 'poker-dealer-password.txt')
+// One level up from scripts/ = the repo root, where the gitignored poker-*.txt
+// files live. This was '..','..' until 2026-08-17: correct when the repo sat in
+// `02. Website\Build 260612-001\`, wrong (and silently fatal) after the
+// 2026-08-05 build-folder promotion moved the repo up a level.
+const KEYS = path.join(__dirname, '..', 'poker-vercel-env-keys.txt')
+const PWOUT = path.join(__dirname, '..', 'poker-dealer-password.txt')
 const ADMIN_EMAIL = 'bas@steinhauserovi.cz'
 
 function parseKeys() {

@@ -24,6 +24,9 @@ export default function Dealer() {
   const [msg, setMsg] = useState('')
   const [templates, setTemplates] = useState<Tmpl[]>([])
   const [name, setName] = useState('')
+  // Can a reset mail actually be sent? Resend is dormant, so normally no —
+  // and a button that cannot work should not be on screen.
+  const [recovery, setRecovery] = useState(false)
 
   async function refresh() {
     const r = await fetch('/api/templates').then(r => r.json())
@@ -31,6 +34,14 @@ export default function Dealer() {
     setTemplates(r.templates ?? [])
   }
   useEffect(() => { refresh() }, [])
+
+  // The session cookie is httpOnly, so ask the server whether we are already
+  // signed in — otherwise a logged-in dealer is shown a login form.
+  useEffect(() => {
+    fetch('/api/dealer/me').then(r => r.json())
+      .then(d => { setAuthed(!!d.admin); setRecovery(!!d.recovery) })
+      .catch(err => log.warn('dealer.sessionCheckFailed', { msg: String(err) }))
+  }, [])
 
   async function login(e: React.FormEvent) {
     e.preventDefault(); setMsg('')
@@ -44,12 +55,15 @@ export default function Dealer() {
   }
   async function forgot() {
     setMsg('')
+    // A blank field is not an enumeration question — refusing it tells a
+    // stranger nothing — so say so plainly instead of claiming a mail was sent.
+    if (!email.trim()) { setMsg(t.enterEmail); return }
     try {
       await fetch('/api/dealer/forgot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) })
     } catch (err) {
       log.error('dealer.forgotFailed', err)
     }
-    setMsg(t.forgotSent)   // always generic — no enumeration
+    setMsg(t.forgotSent)   // identical for a right or wrong address — no enumeration
   }
   async function logout() {
     try { await fetch('/api/dealer/logout', { method: 'POST' }) }
@@ -111,7 +125,10 @@ export default function Dealer() {
             <label>{t.password}<input type="password" value={pw} onChange={e => setPw(e.target.value)} /></label>
             <div className="row">
               <button className="primary" type="submit">{t.login}</button>
-              <button type="button" onClick={forgot}>{t.forgot}</button>
+              {/* Only offered when a mail sender is configured — otherwise this
+                  button can never deliver anything. Recovery without it is
+                  re-running scripts/db-setup.cjs (see the project brief). */}
+              {recovery && <button type="button" onClick={forgot}>{t.forgot}</button>}
             </div>
           </form>
           {msg && <p className="warn" style={{ marginTop: 10 }}>{msg}</p>}
