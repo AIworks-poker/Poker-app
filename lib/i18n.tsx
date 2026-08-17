@@ -5,7 +5,7 @@
  * cookies: the choice lives in localStorage. `en` defines the shape; `cz`/`nl`
  * are typed against it so a missing key fails the build (keeps all three full).
  */
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 
 export type Lang = 'en' | 'cz' | 'nl'
 export const LANGS: { code: Lang; label: string }[] = [
@@ -23,7 +23,11 @@ const en = {
   templates: 'Templates', templatePlayers: (n: number, v: string) => `${n} players · stack ${v}`,
   tagAntes: 'antes', tagRebuys: 'rebuys', tagAddOns: 'add-ons', cashGame: 'cash game',
   splitTag: (s: string) => `split ${s}`, buyInTag: (v: string) => `buy-in ${v}`,
-  editHint: 'To edit a template, open it from ', loaded: (n: string) => `Loaded "${n}".`,
+  poolTag: (v: string) => `pool ≈ ${v}`,
+  // Takes a link renderer so each language picks its own word order AND its own
+  // word for "here" — the anchor is not glued to the end of the sentence.
+  editHint: (link: (label: string) => ReactNode) => <>(To edit a template, click {link('here')})</>,
+  loaded: (n: string) => `Loaded "${n}".`,
   saveOk: (n: string) => `Saved "${n}".`, saveChangedOk: (n: string) => `Saved changes to "${n}".`,
   saveFail: 'Save failed — log in at /dealer first.', promptName: 'Template name?',
   playersFormat: 'Players & format', playersLabel: 'Players', startingStack: 'Starting stack',
@@ -96,7 +100,7 @@ const en = {
   first: '🏆 1st',
 }
 
-type Dict = typeof en
+export type Dict = typeof en
 
 const cz: Dict = {
   title: '♠ Plánovač pokerového turnaje',
@@ -107,7 +111,9 @@ const cz: Dict = {
   templates: 'Šablony', templatePlayers: (n, v) => `${n} hráčů · stack ${v}`,
   tagAntes: 'ante', tagRebuys: 'rebuy', tagAddOns: 'add-ony', cashGame: 'cash game',
   splitTag: (s) => `rozdělení ${s}`, buyInTag: (v) => `buy-in ${v}`,
-  editHint: 'Šablonu upravíte přes ', loaded: (n) => `Načteno „${n}".`,
+  poolTag: (v) => `pot ≈ ${v}`,
+  editHint: (link) => <>(Šablonu upravíte kliknutím {link('zde')})</>,
+  loaded: (n) => `Načteno „${n}".`,
   saveOk: (n) => `Uloženo „${n}".`, saveChangedOk: (n) => `Změny uloženy do „${n}".`,
   saveFail: 'Uložení selhalo — nejprve se přihlaste na /dealer.', promptName: 'Název šablony?',
   playersFormat: 'Hráči a formát', playersLabel: 'Hráči', startingStack: 'Počáteční stack',
@@ -180,7 +186,9 @@ const nl: Dict = {
   templates: 'Sjablonen', templatePlayers: (n, v) => `${n} spelers · stack ${v}`,
   tagAntes: 'antes', tagRebuys: 'rebuys', tagAddOns: 'add-ons', cashGame: 'cashgame',
   splitTag: (s) => `verdeling ${s}`, buyInTag: (v) => `buy-in ${v}`,
-  editHint: 'Bewerk een sjabloon via ', loaded: (n) => `"${n}" geladen.`,
+  poolTag: (v) => `pot ≈ ${v}`,
+  editHint: (link) => <>(Klik {link('hier')} om een sjabloon te bewerken)</>,
+  loaded: (n) => `"${n}" geladen.`,
   saveOk: (n) => `"${n}" opgeslagen.`, saveChangedOk: (n) => `Wijzigingen in "${n}" opgeslagen.`,
   saveFail: 'Opslaan mislukt — log eerst in op /dealer.', promptName: 'Sjabloonnaam?',
   playersFormat: 'Spelers & format', playersLabel: 'Spelers', startingStack: 'Startstack',

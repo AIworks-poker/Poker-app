@@ -13,7 +13,7 @@ import { generateBlinds, totalDuration, type Speed } from '@/lib/blinds'
 import { prizePool, tournamentPayouts, formatMoney } from '@/lib/money'
 import { padelCosts, padelSchedule } from '@/lib/padel'
 import { type Setup, DEFAULT_SETUP, MAX_PLAYERS, normalizeNames, SETUP_KEY, EDITING_KEY } from '@/lib/setup'
-import { useLang } from '@/lib/i18n'
+import { useLang, type Dict } from '@/lib/i18n'
 import { log } from '@/lib/log'
 
 const CHIP_CSS: Record<string, string> = {
@@ -23,6 +23,34 @@ const CHIP_CSS: Record<string, string> = {
 const fmt = (n: number) => n.toLocaleString('en-US')
 
 interface Tmpl { id: string; name: string; config: Partial<Setup> }
+
+/**
+ * The detail line on a template card: buy-in, blind speed, estimated length and
+ * estimated pot. A stored config may be partial (an old row, or one saved before
+ * the planner had a value), so every field is treated as optional — a thin
+ * template just renders a shorter line instead of crashing the home page.
+ */
+function templateFacts(c: Partial<Setup>, t: Dict): string {
+  const money = (v: number) => formatMoney(v, c.currency ?? 'Kč')
+  const parts: string[] = []
+  if (c.buyInPrice) parts.push(t.buyInTag(money(c.buyInPrice)))
+  if (c.speed) parts.push({ fast: t.speedFast, normal: t.speedNormal, slow: t.speedSlow }[c.speed])
+  if (c.players && c.startingStack && c.speed) {
+    const mins = totalDuration(generateBlinds({
+      startingStack: c.startingStack, players: c.players, speed: c.speed,
+      antes: !!c.antes, graceSeconds: c.graceSeconds ?? 0, breakEvery: 4, levels: 16,
+    }))
+    parts.push(`~${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, '0')}`)
+  }
+  if (c.players && c.buyInPrice) {
+    parts.push(t.poolTag(money(prizePool({
+      players: c.players, buyInPrice: c.buyInPrice,
+      rebuys: c.rebuys ? (c.maxRebuysTotal ?? 0) : 0, rebuyPrice: c.rebuyPrice ?? 0,
+      addOns: c.addOns ? c.players : 0, addOnPrice: c.addOnPrice ?? 0,
+    }))))
+  }
+  return parts.join(' · ')
+}
 
 export default function Home() {
   const { t } = useLang()
@@ -164,25 +192,34 @@ export default function Home() {
 
       {saved.length > 0 && (
         <div className="card">
-          <h2 style={{ margin: '0 0 10px' }}>{t.templates}</h2>
+          <h2 style={{ margin: '0 0 10px', display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+            {t.templates}
+            {/* h2 is text-transform:uppercase; the hint is a sentence, not a heading. */}
+            <span className="muted" style={{ fontSize: 11, fontWeight: 400, textTransform: 'none' }}>
+              {t.editHint(label => <a href="/dealer">{label}</a>)}
+            </span>
+          </h2>
           <div className="cards">
             {saved.map(tm => {
               const c = tm.config
               const tags = [c.antes && t.tagAntes, c.rebuys && t.tagRebuys, c.addOns && t.tagAddOns].filter(Boolean).join(' · ')
+              const facts = templateFacts(c, t)
               return (
                 <div key={tm.id} className="tcard">
                   <h3>{tm.name}</h3>
                   <div className="meta">
                     {t.templatePlayers(c.players ?? 0, fmt(c.startingStack ?? 0))}<br />
+                    {facts}{facts ? <br /> : null}
                     {tags}{tags ? <br /> : null}
-                    {c.payoutMode === 'cash' ? t.cashGame : t.splitTag((c.payoutSplit ?? []).join('/'))}
+                    {c.payoutMode === 'cash' ? t.cashGame
+                      : c.payoutSplit?.length ? t.splitTag(c.payoutSplit.join('/'))
+                      : null}
                   </div>
                   <div className="acts"><button className="primary" onClick={() => loadTemplate(tm)}>{t.load}</button></div>
                 </div>
               )
             })}
           </div>
-          <p className="muted" style={{ fontSize: 11, marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>{t.editHint}<a href="/dealer"><button className="primary" style={{ padding: '4px 14px', fontSize: 12 }}>/dealer</button></a></p>
         </div>
       )}
       {msg && <p className="warn">{msg}</p>}
