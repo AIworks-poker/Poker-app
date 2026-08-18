@@ -7,9 +7,11 @@
  * to the dealer backstage.
  */
 import { useEffect, useState } from 'react'
+import { useLang } from '@/lib/i18n'
 import { log } from '@/lib/log'
 
 export default function AdminBadge() {
+  const { t } = useLang()
   const [admin, setAdmin] = useState(false)
   useEffect(() => {
     fetch('/api/dealer/me').then(r => r.json()).then(d => setAdmin(!!d.admin))
@@ -17,6 +19,6 @@ export default function AdminBadge() {
   }, [])
   if (!admin) return null
   return (
-    <a href="/dealer" title="Logged in as dealer" aria-label="Logged in as dealer" className="admin-badge">B</a>
+    <a href="/dealer" title={t.adminBadgeTitle} aria-label={t.adminBadgeTitle} className="admin-badge">B</a>
   )
 }

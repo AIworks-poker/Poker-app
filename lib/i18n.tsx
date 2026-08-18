@@ -89,6 +89,7 @@ const en = {
   // dealer
   dealer: '🎴 Dealer', dealerSub: 'Backstage — saving public templates. Dealer only.',
   email: 'Email', password: 'Password', login: 'Log in', forgot: 'Forgot password', loginFail: 'Login failed.',
+  emailPlaceholder: 'you@example.com', adminBadgeTitle: 'Logged in as dealer',
   forgotSent: 'If that address is the dealer, a reset link is on its way.',
   saveCurrent: 'Save current setup as a new template', tmplNamePh: 'e.g. 12-player Friday', saveNew: 'Save new',
   saveCurrentHint1: 'Saves whatever you last configured on the ', saveCurrentHint2: '. To change an existing template, use ', saveCurrentHint3: ' below.',
@@ -171,6 +172,7 @@ const cz: Dict = {
   cashNote: (rate, cur, total) => `Peníze = konečné žetony × ${rate} ${cur} (bank ÷ všech ${total} žetonů ve hře — včetně padel náskoku). Zadejte konečný stack každého hráče výše; součet má být ${total}.`,
   dealer: '🎴 Dealer', dealerSub: 'Zákulisí — ukládání veřejných šablon. Pouze dealer.',
   email: 'E-mail', password: 'Heslo', login: 'Přihlásit', forgot: 'Zapomenuté heslo', loginFail: 'Přihlášení selhalo.',
+  emailPlaceholder: 'vy@priklad.cz', adminBadgeTitle: 'Přihlášen jako dealer',
   forgotSent: 'Pokud je to adresa dealera, odkaz pro obnovu je na cestě.',
   saveCurrent: 'Uložit aktuální nastavení jako novou šablonu', tmplNamePh: 'např. Páteční 12 hráčů', saveNew: 'Uložit novou',
   saveCurrentHint1: 'Uloží to, co jste naposledy nastavili na ', saveCurrentHint2: '. Existující šablonu změníte tlačítkem ', saveCurrentHint3: ' níže.',
@@ -249,6 +251,7 @@ const nl: Dict = {
   cashNote: (rate, cur, total) => `Cash = eindfiches × ${rate} ${cur} (prijzenpot ÷ alle ${total} fiches in het spel — inclusief padel-voorsprongfiches). Voer hierboven ieders eindstack in; die moeten optellen tot ${total}.`,
   dealer: '🎴 Dealer', dealerSub: 'Backstage — publieke sjablonen opslaan. Alleen dealer.',
   email: 'E-mail', password: 'Wachtwoord', login: 'Inloggen', forgot: 'Wachtwoord vergeten', loginFail: 'Inloggen mislukt.',
+  emailPlaceholder: 'jij@voorbeeld.nl', adminBadgeTitle: 'Ingelogd als dealer',
   forgotSent: 'Als dat het dealer-adres is, is er een herstellink onderweg.',
   saveCurrent: 'Huidige instelling als nieuw sjabloon opslaan', tmplNamePh: 'bijv. Vrijdag 12 spelers', saveNew: 'Nieuw opslaan',
   saveCurrentHint1: 'Slaat op wat je het laatst instelde op de ', saveCurrentHint2: '. Een bestaand sjabloon wijzig je met ', saveCurrentHint3: ' hieronder.',

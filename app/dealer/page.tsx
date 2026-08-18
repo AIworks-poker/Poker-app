@@ -121,7 +121,7 @@ export default function Dealer() {
         <div className="card">
           <p className="sub">{t.dealerSub}</p>
           <form onSubmit={login} className="row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
-            <label>{t.email}<input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" /></label>
+            <label>{t.email}<input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={t.emailPlaceholder} /></label>
             <label>{t.password}<input type="password" value={pw} onChange={e => setPw(e.target.value)} /></label>
             <div className="row">
               <button className="primary" type="submit">{t.login}</button>
